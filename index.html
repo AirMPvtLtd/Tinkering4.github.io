@@ -124,6 +124,11 @@
             border-radius: 4px;
             font-size: 10px;
         }
+
+        .dynamic-height {
+            height: calc(100vh - 180px);
+            min-height: 500px;
+        }
     </style>
 </head>
 <body>
@@ -249,7 +254,6 @@ def mode(pids, throttle, angles, targets, dt):
                         window.require(['vs/editor/editor.main'], () => {
                             if (editorRef.current) editorRef.current.dispose();
                             
-                            // Create editor
                             editorRef.current = monaco.editor.create(document.getElementById('editor'), {
                                 value: codeTemplates[activeTab],
                                 language: 'python',
@@ -261,7 +265,6 @@ def mode(pids, throttle, angles, targets, dt):
                                 automaticLayout: true
                             });
                             
-                            // Update content on change
                             editorRef.current.onDidChangeModelContent(() => {
                                 setEditorContent(editorRef.current.getValue());
                             });
@@ -288,12 +291,10 @@ def mode(pids, throttle, angles, targets, dt):
                 if (!containerRef.current) return;
                 
                 try {
-                    // Create scene
                     const scene = new THREE.Scene();
                     scene.background = null;
                     sceneRef.current = scene;
                     
-                    // Create camera
                     const camera = new THREE.PerspectiveCamera(
                         75, 
                         containerRef.current.clientWidth / 300, 
@@ -304,7 +305,6 @@ def mode(pids, throttle, angles, targets, dt):
                     camera.lookAt(0, 0, 0);
                     cameraRef.current = camera;
                     
-                    // Create renderer
                     const renderer = new THREE.WebGLRenderer({ 
                         antialias: true, 
                         alpha: true 
@@ -316,10 +316,8 @@ def mode(pids, throttle, angles, targets, dt):
                     containerRef.current.appendChild(renderer.domElement);
                     rendererRef.current = renderer;
                     
-                    // Create drone
                     const droneGroup = new THREE.Group();
                     
-                    // Main body
                     const bodyGeometry = new THREE.BoxGeometry(0.5, 0.2, 0.5);
                     const bodyMaterial = new THREE.MeshBasicMaterial({ 
                         color: 0x00f0ff,
@@ -328,7 +326,6 @@ def mode(pids, throttle, angles, targets, dt):
                     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
                     droneGroup.add(body);
                     
-                    // Arms
                     const armGeometry = new THREE.BoxGeometry(0.8, 0.05, 0.05);
                     const armMaterial = new THREE.MeshBasicMaterial({ 
                         color: 0xff3e7f,
@@ -346,7 +343,6 @@ def mode(pids, throttle, angles, targets, dt):
                         droneGroup.add(arm);
                     }
                     
-                    // Propellers
                     const propGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.02, 16);
                     const propMaterial = new THREE.MeshBasicMaterial({ 
                         color: 0x00ff88,
@@ -366,7 +362,6 @@ def mode(pids, throttle, angles, targets, dt):
                     scene.add(droneGroup);
                     droneGroupRef.current = droneGroup;
                     
-                    // Lighting
                     const ambientLight = new THREE.AmbientLight(0x404040);
                     scene.add(ambientLight);
                     
@@ -374,60 +369,72 @@ def mode(pids, throttle, angles, targets, dt):
                     pointLight.position.set(5, 5, 5);
                     scene.add(pointLight);
                     
-                    // Animation loop
                     let animationFrameId;
                     const animate = () => {
-                        if (isSimulating && droneGroupRef.current) {
-                            droneGroupRef.current.rotation.x = angles[1] * (Math.PI / 180);
-                            droneGroupRef.current.rotation.z = -angles[0] * (Math.PI / 180);
-                            droneGroupRef.current.rotation.y = angles[2] * (Math.PI / 180);
-                            droneGroupRef.current.position.y = height * 0.1;
+                        try {
+                            if (isSimulating && droneGroupRef.current) {
+                                droneGroupRef.current.rotation.x = angles[1] * (Math.PI / 180);
+                                droneGroupRef.current.rotation.z = -angles[0] * (Math.PI / 180);
+                                droneGroupRef.current.rotation.y = angles[2] * (Math.PI / 180);
+                                droneGroupRef.current.position.y = height * 0.1;
+                                
+                                droneGroupRef.current.children.forEach((child, index) => {
+                                    if (index >= 5) {
+                                        child.rotation.z += 0.1;
+                                    }
+                                });
+                            }
                             
-                            // Animate propellers
-                            droneGroupRef.current.children.forEach((child, index) => {
-                                if (index >= 5) {
-                                    child.rotation.z += 0.1;
-                                }
-                            });
+                            if (rendererRef.current && sceneRef.current && cameraRef.current) {
+                                rendererRef.current.render(sceneRef.current, cameraRef.current);
+                            }
+                            animationFrameId = requestAnimationFrame(animate);
+                        } catch (error) {
+                            console.error('Animation Error:', error);
+                            setSimulationError('Animation rendering failed');
+                            cancelAnimationFrame(animationFrameId);
                         }
-                        
-                        if (rendererRef.current && sceneRef.current && cameraRef.current) {
-                            rendererRef.current.render(sceneRef.current, cameraRef.current);
-                        }
-                        animationFrameId = requestAnimationFrame(animate);
                     };
                     
                     animate();
                     setSimulationError(null);
                     
-                    // Handle window resize
                     const handleResize = () => {
-                        if (containerRef.current && cameraRef.current && rendererRef.current) {
-                            cameraRef.current.aspect = containerRef.current.clientWidth / 300;
-                            cameraRef.current.updateProjectionMatrix();
-                            rendererRef.current.setSize(
-                                containerRef.current.clientWidth, 
-                                300
-                            );
+                        try {
+                            if (containerRef.current && cameraRef.current && rendererRef.current) {
+                                cameraRef.current.aspect = containerRef.current.clientWidth / 300;
+                                cameraRef.current.updateProjectionMatrix();
+                                rendererRef.current.setSize(
+                                    containerRef.current.clientWidth, 
+                                    300
+                                );
+                            }
+                        } catch (error) {
+                            console.error('Resize Error:', error);
+                            setSimulationError('Window resize handling failed');
                         }
                     };
                     
                     window.addEventListener('resize', handleResize);
                     
-                    // Cleanup
                     return () => {
-                        cancelAnimationFrame(animationFrameId);
-                        window.removeEventListener('resize', handleResize);
-                        if (rendererRef.current) {
-                            rendererRef.current.dispose();
-                        }
-                        if (containerRef.current && rendererRef.current?.domElement) {
-                            containerRef.current.removeChild(rendererRef.current.domElement);
+                        try {
+                            cancelAnimationFrame(animationFrameId);
+                            window.removeEventListener('resize', handleResize);
+                            if (rendererRef.current) {
+                                rendererRef.current.dispose();
+                            }
+                            if (containerRef.current && rendererRef.current?.domElement) {
+                                containerRef.current.removeChild(rendererRef.current.domElement);
+                            }
+                        } catch (error) {
+                            console.error('Cleanup Error:', error);
+                            setSimulationError('Simulation cleanup failed');
                         }
                     };
                 } catch (error) {
-                    console.error('3D Error:', error);
-                    setSimulationError('Failed to load 3D simulation');
+                    console.error('3D Initialization Error:', error);
+                    setSimulationError('Failed to initialize 3D simulation');
                 }
             }, [isSimulating, angles, height]);
 
@@ -484,10 +491,8 @@ def mode(pids, throttle, angles, targets, dt):
                 setStatus('Building...');
                 setBuildOutput('');
                 
-                // Simulate build process
                 setTimeout(() => {
                     try {
-                        // Validate code
                         if (!editorContent.includes('def mode(')) {
                             throw new Error('Missing mode() function');
                         }
@@ -520,29 +525,24 @@ def mode(pids, throttle, angles, targets, dt):
             const deployToDrone = () => {
                 setStatus('Connecting to drone...');
                 
-                // Simulate deployment with checks
                 setTimeout(() => {
-                    // Check WiFi connection
-                    const isWifiConnected = Math.random() > 0.2; // Simulate 80% success rate
+                    const isWifiConnected = Math.random() > 0.2;
                     if (!isWifiConnected) {
                         setStatus('Deployment failed: No WiFi connection (192.168.4.1)');
                         return;
                     }
                     
-                    // Check code validation
                     if (!buildOutput.includes('successful')) {
                         setStatus('Deployment failed: Code not built successfully');
                         return;
                     }
                     
-                    // Check drone availability
-                    const isDroneAvailable = Math.random() > 0.1; // Simulate 90% success rate
+                    const isDroneAvailable = Math.random() > 0.1;
                     if (!isDroneAvailable) {
                         setStatus('Deployment failed: Drone not responding');
                         return;
                     }
                     
-                    // Check code size
                     if (editorContent.length > 10000) {
                         setStatus('Deployment failed: Code size exceeds drone memory limit');
                         return;
@@ -564,7 +564,6 @@ def mode(pids, throttle, angles, targets, dt):
                 try {
                     let convertedCode = '';
                     
-                    // Simple logic conversion examples
                     if (logicInput.toLowerCase().includes('if height >')) {
                         const value = logicInput.match(/height > (\d+)/)?.[1];
                         convertedCode = `if height > ${value}:\n    # Reduce throttle\n    throttle = max(throttle - 10, 0)`;
@@ -577,7 +576,6 @@ def mode(pids, throttle, angles, targets, dt):
                         convertedCode = `# Custom logic\n# ${logicInput}\n# Implement your logic here`;
                     }
                     
-                    // Update editor
                     const newContent = editorContent + '\n\n' + convertedCode;
                     setEditorContent(newContent);
                     editorRef.current.setValue(newContent);
@@ -593,18 +591,15 @@ def mode(pids, throttle, angles, targets, dt):
                 setActiveTab('CHALLENGES');
                 setStatus(`Challenge: ${challenge.title}`);
                 
-                // Update editor with challenge template
                 const newContent = codeTemplates['CHALLENGES'] + `\n\n# Challenge: ${challenge.title}\n# ${challenge.description}`;
                 setEditorContent(newContent);
                 editorRef.current.setValue(newContent);
                 
-                // Mark as attempted
                 setUserProgress(prev => ({
                     ...prev,
                     [challenge.id]: { ...prev[challenge.id], attempted: true }
                 }));
                 
-                // Start simulation
                 setIsSimulating(true);
             };
 
@@ -613,9 +608,7 @@ def mode(pids, throttle, angles, targets, dt):
                 const criteria = challenge.criteria;
                 setStatus('Evaluating...');
                 
-                // Simulate evaluation
                 setTimeout(() => {
-                    // Simple check based on current state
                     const heightOk = Math.abs(height - criteria.height) <= 0.5;
                     const rollOk = Math.abs(angles[0]) <= criteria.rollMax;
                     const pitchOk = Math.abs(angles[1]) <= criteria.pitchMax;
@@ -623,13 +616,11 @@ def mode(pids, throttle, angles, targets, dt):
                     if (heightOk && rollOk && pitchOk) {
                         setStatus('Challenge completed!');
                         
-                        // Update progress
                         setUserProgress(prev => ({
                             ...prev,
                             [challenge.id]: { completed: true, score: challenge.points }
                         }));
                         
-                        // Update leaderboard
                         setLeaderboard(prev => {
                             const newLeaderboard = prev.map(entry => 
                                 entry.name === username 
@@ -647,7 +638,6 @@ def mode(pids, throttle, angles, targets, dt):
 
             return (
                 <div className="interface-font p-4 max-w-[100vw]">
-                    {/* Profile Creation Modal */}
                     {showProfileModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
                             <div className="cyber-card p-6 w-96">
@@ -687,14 +677,13 @@ def mode(pids, throttle, angles, targets, dt):
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 scrollable-container">
-                        {/* Left Column - Editor */}
-                        <div className="cyber-card p-4">
+                        <div className="cyber-card p-4 dynamic-height flex flex-col">
                             <h3 className="text-lg mb-2" style={{ color: '#00f0ff' }}>
                                 CODE EDITOR
                             </h3>
                             <div 
                                 id="editor" 
-                                className="editor-font h-96 w-full border border-gray-700 rounded"
+                                className="editor-font flex-grow w-full border border-gray-700 rounded"
                                 style={{ backgroundColor: '#0a0a1a' }}
                             ></div>
                             
@@ -742,14 +731,13 @@ def mode(pids, throttle, angles, targets, dt):
                             )}
                         </div>
                         
-                        {/* Middle Column - Simulation */}
-                        <div className="cyber-card p-4">
+                        <div className="cyber-card p-4 dynamic-height flex flex-col">
                             <h3 className="text-lg mb-2" style={{ color: '#00f0ff' }}>
                                 {simulationError ? 'SIMULATION ERROR' : 'DRONE SIMULATION'}
                             </h3>
                             
                             {simulationError ? (
-                                <div className="text-red-400 p-4 text-center">
+                                <div className="text-red-400 p-4 text-center flex-grow">
                                     {simulationError}
                                 </div>
                             ) : (
@@ -830,8 +818,7 @@ def mode(pids, throttle, angles, targets, dt):
                             )}
                         </div>
                         
-                        {/* Right Column - Controls */}
-                        <div className="cyber-card p-4">
+                        <div className="cyber-card p-4 dynamic-height flex flex-col">
                             <h3 className="text-lg mb-2" style={{ color: '#00f0ff' }}>
                                 CONTROL MODULES
                             </h3>
@@ -858,7 +845,7 @@ def mode(pids, throttle, angles, targets, dt):
                             </div>
                             
                             {activeTab === 'CHALLENGES' && (
-                                <div className="mb-4">
+                                <div className="mb-4 flex-grow overflow-y-auto">
                                     <h4 className="text-md mb-2" style={{ color: '#ff3e7f' }}>
                                         CHALLENGES
                                     </h4>
@@ -915,7 +902,7 @@ def mode(pids, throttle, angles, targets, dt):
                     </div>
                     
                     <div className="cyber-card p-2 mt-4 text-center text-xs">
-                        CONNECT TO DRONE WIFI (192.168.4.1) BEFORE DEPLOYING | VERSION: FATEH 1.0
+                        CONNECT TO DRONE WIFI BEFORE DEPLOYING | VERSION: FATEH 1.0
                     </div>
                 </div>
             );
