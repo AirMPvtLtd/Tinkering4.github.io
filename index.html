@@ -75,6 +75,20 @@
             box-shadow: 0 0 8px var(--primary);
         }
         
+        .delete-button {
+            background: rgba(255, 62, 127, 0.1);
+            color: var(--secondary);
+            border: 1px solid var(--secondary);
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .delete-button:hover {
+            background: rgba(255, 62, 127, 0.2);
+            box-shadow: 0 0 8px var(--secondary);
+        }
+        
         .status-active {
             background: var(--primary);
             box-shadow: 0 0 8px var(--primary);
@@ -136,7 +150,6 @@
 
     <script type="text/babel">
         function App() {
-            // State management
             const [status, setStatus] = React.useState('Initializing...');
             const [isSimulating, setIsSimulating] = React.useState(false);
             const [angles, setAngles] = React.useState([0, 0, 0]);
@@ -173,8 +186,8 @@
             const [leaderboard, setLeaderboard] = React.useState([]);
             const [username, setUsername] = React.useState('');
             const [showProfileModal, setShowProfileModal] = React.useState(true);
+            const [selectedProfiles, setSelectedProfiles] = React.useState([]);
 
-            // Refs for Three.js
             const containerRef = React.useRef(null);
             const sceneRef = React.useRef(null);
             const cameraRef = React.useRef(null);
@@ -182,35 +195,24 @@
             const droneGroupRef = React.useRef(null);
             const editorRef = React.useRef(null);
 
-            // Default code templates
             const codeTemplates = {
                 'FATEH-V1': `# FATEH V1 DEFAULT CONTROL SYSTEM
 def mode(pids, throttle, angles, targets, dt):
-    # Basic control - all motors at equal speed
     motor_speed = 65535 * (throttle / 100)
     return (motor_speed, motor_speed, motor_speed, motor_speed)`,
                 
                 'CUSTOM': `# CUSTOM DRONE CONTROL FUNCTION
 def mode(pids, throttle, angles, targets, dt):
-    # PID gains
-    kp = 1.0    # Proportional
-    ki = 0.05   # Integral
-    kd = 0.2    # Derivative
-    
-    # Set PID controller gains
-    pids[0].set_gains(kp, ki, kd)  # Roll
-    pids[1].set_gains(kp, ki, kd)  # Pitch
-    pids[2].set_gains(kp/2, ki, kd) # Yaw
-    
-    # Base throttle (50% of max at 100% throttle input)
+    kp = 1.0
+    ki = 0.05
+    kd = 0.2
+    pids[0].set_gains(kp, ki, kd)
+    pids[1].set_gains(kp, ki, kd)
+    pids[2].set_gains(kp/2, ki, kd)
     base = max(throttle * 65535 * 0.5 / 100, 65535 * 0.25)
-    
-    # Calculate corrections
     roll_corr = pids[0].update(targets[0], angles[0], dt)
     pitch_corr = pids[1].update(targets[1], angles[1], dt)
     yaw_corr = pids[2].update(targets[2], angles[2], dt)
-    
-    # Calculate motor outputs (FL, FR, RL, RR)
     return (
         base + pitch_corr + roll_corr + yaw_corr,
         base + pitch_corr - roll_corr - yaw_corr,
@@ -220,24 +222,16 @@ def mode(pids, throttle, angles, targets, dt):
                 
                 'CHALLENGES': `# CHALLENGE MODE TEMPLATE
 def mode(pids, throttle, angles, targets, dt):
-    # Implement your solution for the challenge here
-    # Remember to use PID controllers for stability
-    
-    # Example stabilization code:
     kp = 1.0
     ki = 0.05
     kd = 0.2
-    
-    pids[0].set_gains(kp, ki, kd)  # Roll
-    pids[1].set_gains(kp, ki, kd)  # Pitch
-    pids[2].set_gains(kp/2, ki, kd) # Yaw
-    
+    pids[0].set_gains(kp, ki, kd)
+    pids[1].set_gains(kp, ki, kd)
+    pids[2].set_gains(kp/2, ki, kd)
     base = max(throttle * 65535 * 0.5 / 100, 65535 * 0.25)
-    
-    roll_corr = pids[0].update(0, angles[0], dt)  # Target roll 0
-    pitch_corr = pids[1].update(0, angles[1], dt) # Target pitch 0
-    yaw_corr = pids[2].update(0, angles[2], dt)   # Target yaw 0
-    
+    roll_corr = pids[0].update(0, angles[0], dt)
+    pitch_corr = pids[1].update(0, angles[1], dt)
+    yaw_corr = pids[2].update(0, angles[2], dt)
     return (
         base + pitch_corr + roll_corr + yaw_corr,
         base + pitch_corr - roll_corr - yaw_corr,
@@ -246,7 +240,6 @@ def mode(pids, throttle, angles, targets, dt):
     )`
             };
 
-            // Initialize editor
             React.useEffect(() => {
                 const initializeEditor = async () => {
                     try {
@@ -272,7 +265,7 @@ def mode(pids, throttle, angles, targets, dt):
                             setStatus('Ready');
                         });
                     } catch (error) {
-                        console.error('Editor error:', error);
+                        console.error('Editor Initialization Error:', error);
                         setStatus('Editor initialization failed');
                     }
                 };
@@ -286,11 +279,22 @@ def mode(pids, throttle, angles, targets, dt):
                 };
             }, [activeTab]);
 
-            // Initialize 3D simulation
             React.useEffect(() => {
-                if (!containerRef.current) return;
-                
+                if (!containerRef.current) {
+                    setSimulationError('Container element not found');
+                    return;
+                }
+
+                let animationFrameId;
                 try {
+                    if (!window.THREE) {
+                        throw new Error('Three.js library not loaded');
+                    }
+
+                    if (!WebGLRenderingContext || !document.createElement('canvas').getContext('webgl')) {
+                        throw new Error('WebGL not supported by this browser');
+                    }
+
                     const scene = new THREE.Scene();
                     scene.background = null;
                     sceneRef.current = scene;
@@ -369,7 +373,6 @@ def mode(pids, throttle, angles, targets, dt):
                     pointLight.position.set(5, 5, 5);
                     scene.add(pointLight);
                     
-                    let animationFrameId;
                     const animate = () => {
                         try {
                             if (isSimulating && droneGroupRef.current) {
@@ -391,7 +394,7 @@ def mode(pids, throttle, angles, targets, dt):
                             animationFrameId = requestAnimationFrame(animate);
                         } catch (error) {
                             console.error('Animation Error:', error);
-                            setSimulationError('Animation rendering failed');
+                            setSimulationError('Animation rendering failed: ' + error.message);
                             cancelAnimationFrame(animationFrameId);
                         }
                     };
@@ -411,7 +414,7 @@ def mode(pids, throttle, angles, targets, dt):
                             }
                         } catch (error) {
                             console.error('Resize Error:', error);
-                            setSimulationError('Window resize handling failed');
+                            setSimulationError('Window resize handling failed: ' + error.message);
                         }
                     };
                     
@@ -429,16 +432,15 @@ def mode(pids, throttle, angles, targets, dt):
                             }
                         } catch (error) {
                             console.error('Cleanup Error:', error);
-                            setSimulationError('Simulation cleanup failed');
+                            setSimulationError('Simulation cleanup failed: ' + error.message);
                         }
                     };
                 } catch (error) {
                     console.error('3D Initialization Error:', error);
-                    setSimulationError('Failed to initialize 3D simulation');
+                    setSimulationError('Failed to initialize 3D simulation: ' + error.message);
                 }
             }, [isSimulating, angles, height]);
 
-            // Handle profile creation
             const handleCreateProfile = () => {
                 if (!username.trim()) {
                     setStatus('Please enter a username');
@@ -461,7 +463,32 @@ def mode(pids, throttle, angles, targets, dt):
                 setStatus('Profile created');
             };
 
-            // Handle control commands
+            const handleCheckboxChange = (name) => {
+                setSelectedProfiles(prev => 
+                    prev.includes(name)
+                        ? prev.filter(n => n !== name)
+                        : [...prev, name]
+                );
+            };
+
+            const handleDeleteProfile = () => {
+                if (selectedProfiles.length === 0) {
+                    setStatus('Please select a profile to delete');
+                    return;
+                }
+                if (!selectedProfiles.includes(username)) {
+                    setStatus('Can only delete your own profile');
+                    setSelectedProfiles([]);
+                    return;
+                }
+                setLeaderboard(prev => {
+                    const newLeaderboard = prev.filter(entry => !selectedProfiles.includes(entry.name));
+                    return [...newLeaderboard];
+                });
+                setSelectedProfiles([]);
+                setStatus('Profile deleted');
+            };
+
             const handleControl = (command) => {
                 const step = 1;
                 let newAngles = [...angles];
@@ -486,7 +513,6 @@ def mode(pids, throttle, angles, targets, dt):
                 setHeight(newHeight);
             };
 
-            // Build code
             const buildCode = () => {
                 setStatus('Building...');
                 setBuildOutput('');
@@ -506,7 +532,6 @@ def mode(pids, throttle, angles, targets, dt):
                 }, 1000);
             };
 
-            // Start simulation
             const startSimulation = () => {
                 if (buildOutput.includes('failed')) {
                     setStatus('Fix build errors first');
@@ -521,7 +546,6 @@ def mode(pids, throttle, angles, targets, dt):
                 }, 500);
             };
 
-            // Deploy to drone
             const deployToDrone = () => {
                 setStatus('Connecting to drone...');
                 
@@ -552,7 +576,6 @@ def mode(pids, throttle, angles, targets, dt):
                 }, 2000);
             };
 
-            // Convert logic to code
             const convertLogic = () => {
                 if (!logicInput.trim()) {
                     setStatus('Enter logic first');
@@ -586,7 +609,6 @@ def mode(pids, throttle, angles, targets, dt):
                 }
             };
 
-            // Handle challenge selection
             const selectChallenge = (challenge) => {
                 setActiveTab('CHALLENGES');
                 setStatus(`Challenge: ${challenge.title}`);
@@ -603,7 +625,6 @@ def mode(pids, throttle, angles, targets, dt):
                 setIsSimulating(true);
             };
 
-            // Check challenge completion
             const checkChallenge = (challenge) => {
                 const criteria = challenge.criteria;
                 setStatus('Evaluating...');
@@ -628,7 +649,7 @@ def mode(pids, throttle, angles, targets, dt):
                                     : entry
                             ).sort((a, b) => b.score - a.score);
                             
-                            return newLeaderboard;
+                            return [...newLeaderboard];
                         });
                     } else {
                         setStatus('Challenge not completed');
@@ -890,14 +911,29 @@ def mode(pids, throttle, angles, targets, dt):
                             <h4 className="text-md mb-2" style={{ color: '#ff3e7f' }}>
                                 LEADERBOARD
                             </h4>
-                            <div className="space-y-2">
+                            <div className="space-y-2 flex-grow">
                                 {leaderboard.sort((a, b) => b.score - a.score).slice(0, 5).map((entry, index) => (
-                                    <div key={index} className="flex justify-between items-center">
-                                        <span>{index + 1}. {entry.name}</span>
+                                    <div key={entry.name} className="flex justify-between items-center">
+                                        <label className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedProfiles.includes(entry.name)}
+                                                onChange={() => handleCheckboxChange(entry.name)}
+                                                disabled={entry.name !== username}
+                                                className="mr-2"
+                                            />
+                                            <span>{index + 1}. {entry.name}</span>
+                                        </label>
                                         <span style={{ color: '#00f0ff' }}>{entry.score} CR</span>
                                     </div>
                                 ))}
                             </div>
+                            <button
+                                onClick={handleDeleteProfile}
+                                className="delete-button mt-4 w-full"
+                            >
+                                DELETE
+                            </button>
                         </div>
                     </div>
                     
