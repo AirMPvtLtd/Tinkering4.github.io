@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AirM Fateh Drone Logic Learner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js"></script>
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 5px #00FF00; } 50% { box-shadow: 0 0 15px #00FF00; } 100% { box-shadow: 0 0 5px #00FF00; } }
+        @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 100% 0; } }
+        @keyframes futuristic-glow { 0% { box-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF; } 50% { box-shadow: 0 0 10px #00FF00, 0 0 20px #00FF00; } 100% { box-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF; } }
+        .futuristic-border { border: 2px solid #00FFFF; box-shadow: 0 0 10px #00FFFF; }
+        .scan-effect { background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), transparent); animation: scan 2s linear infinite; }
+        .futuristic-button { @apply bg-gray-700 text-[#00FFFF] border border-[#00FF00] p-2 rounded-lg transition-all duration-300; box-shadow: 0 0 5px #00FFFF; animation: futuristic-glow 2s infinite; }
+        .futuristic-button:hover { @apply bg-[#00FF00] text-black; box-shadow: 0 0 15px #00FF00; }
+        .futuristic-button.active { @apply bg-[#00FF00] text-black; box-shadow: 0 0 20px #00FF00; }
+        .gamepad { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px; background: rgba(0, 0, 0, 0.5); border-radius: 10px; width: fit-content; margin: 20px auto 0; }
+        .gamepad-row { display: flex; gap: 10px; }
+        .gamepad-button { @apply bg-gray-700 text-[#00FFFF] border border-[#00FF00] p-4 rounded-lg transition-all duration-300; box-shadow: 0 0 5px #00FFFF; cursor: pointer; font-size: 16px; min-width: 80px; text-align: center; }
+        .gamepad-button:hover { @apply bg-[#00FF00] text-black; box-shadow: 0 0 15px #00FF00; }
+        .dpad { display: grid; grid-template-areas: "up up up" "left down right" "empty empty empty"; gap: 5px; }
+        .dpad .up { grid-area: up; }
+        .dpad .left { grid-area: left; }
+        .dpad .down { grid-area: down; }
+        .dpad .right { grid-area: right; }
+    </style>
+</head>
+<body class="bg-gray-800 text-white font-mono">
+    <div id="root" class="min-h-screen"></div>
+
+    <script type="text/babel">
+        function Tab({ label, isActive, onClick }) {
+            return (
+                <button
+                    className={`futuristic-button w-full text-left ${isActive ? 'active' : ''}`}
+                    onClick={onClick}
+                >
+                    {label}
+                </button>
+            );
+        }
+
+        function Tabs({ activeTab, onTabChange }) {
+            const tabOrder = ['Fateh V1.0', 'Write Your Own Logic'];
+            return (
+                <div className="bg-gray-900 p-6 futuristic-border h-[200px] flex flex-col justify-start animate-[pulse_2s_infinite]">
+                    <h2 className="text-xl font-bold mb-4 text-[#00FF00] text-center">CODE MODULES</h2>
+                    <div className="flex flex-col gap-2">
+                        {tabOrder.map((tab) => (
+                            <Tab
+                                key={tab}
+                                label={tab}
+                                isActive={activeTab === tab}
+                                onClick={() => onTabChange(tab)}
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function AnimationWindow({ status }) {
+            let animation = null;
+            if (status === 'Uploading...' || status === 'Building...' || status === 'Checking Drone...' || status === 'Creating Simulation...' || status === 'Converting...' || status === 'Fetching Code...') {
+                animation = (
+                    <div className="flex justify-center items-center h-full">
+                        <div className="w-12 h-12 border-4 border-[#00FFFF] border-t-transparent rounded-full animate-[spin_1s_linear_infinite]"></div>
+                    </div>
+                );
+            } else if (status === 'Code uploaded' || status === 'Simulation Created' || status === 'Code Converted' || status === 'Latest code fetched') {
+                animation = (
+                    <div className="flex justify-center items-center h-full">
+                        <svg className="w-12 h-12 text-[#00FF00] animate-[pulse_1s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                );
+            } else if (status.startsWith('Error') || status === 'Drone server not reachable' || status === 'Drone is not connected') {
+                animation = (
+                    <div className="flex justify-center items-center h-full">
+                        <svg className="w-12 h-12 text-red-500 animate-[pulse_1s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </div>
+                );
+            }
+            return (
+                <div className="bg-gray-900 p-6 futuristic-border h-[150px] flex flex-col justify-center items-center scan-effect">
+                    <h2 className="text-xl font-bold mb-4 text-[#00FFFF] text-center">SYSTEM STATUS</h2>
+                    {animation || <p className="text-[#00FF00] text-center">{status}</p>}
+                </div>
+            );
+        }
+
+        function SimulationWindow({ selectedType, selectedValue, isSimulating, setIsSimulating, angles, setAngles, height, setHeight }) {
+            const canvasRef = React.useRef(null);
+
+            React.useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d');
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const radius = canvas.width / 2;
+                let animationFrameId;
+
+                const drawHorizon = (roll = 0, pitch = 0, yaw = 0) => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius * 0.8, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(roll * Math.PI / 180);
+                    ctx.rotate(pitch * Math.PI / 180);
+                    const horizonRadius = radius * 0.7;
+                    ctx.fillStyle = 'rgb(0, 191, 255)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, horizonRadius, 0, Math.PI, true);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgb(139, 69, 19)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, horizonRadius, 0, Math.PI, false);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, horizonRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.lineWidth = 1;
+                    for (let i = -90; i <= 90; i += 10) {
+                        const baseAngle = (i / 90) * Math.PI / 2;
+                        const rotatedAngle = baseAngle - Math.PI / 2;
+                        const lineRadius = horizonRadius * 0.6;
+                        const y = Math.sin(rotatedAngle) * lineRadius;
+                        const x = Math.cos(rotatedAngle) * lineRadius;
+                        if (i !== 0) {
+                            ctx.beginPath();
+                            ctx.moveTo(-5, y);
+                            ctx.lineTo(5, y);
+                            ctx.stroke();
+                            ctx.fillStyle = '#ffffff';
+                            ctx.font = '10px monospace';
+                            ctx.save();
+                            ctx.translate(x, y);
+                            ctx.rotate(-roll * Math.PI / 180 - pitch * Math.PI / 180 - Math.PI / 2);
+                            ctx.fillText(`${i}°`, 10, 2);
+                            ctx.restore();
+                        }
+                    }
+                    ctx.restore();
+                    ctx.fillStyle = 'rgb(0, 255, 255)';
+                    ctx.font = '16px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`TARGET: ${selectedValue || 'NONE'}`, centerX, centerY - radius * 0.8 - 20);
+                    ctx.fillText(`Roll: ${roll.toFixed(1)}°`, centerX, centerY + radius * 0.8 + 20);
+                    ctx.fillText(`Pitch: ${pitch.toFixed(1)}°`, centerX, centerY + radius * 0.8 + 40);
+                    ctx.fillText(`Height: ${height} meters`, centerX, centerY + radius * 0.8 + 60);
+                    ctx.fillText(`Yaw: ${yaw.toFixed(1)}°`, centerX, centerY + radius * 0.8 + 80);
+                };
+
+                drawHorizon(angles[0], angles[1], angles[2]);
+
+                if (isSimulating) {
+                    const animate = () => {
+                        drawHorizon(angles[0], angles[1], angles[2]);
+                        animationFrameId = requestAnimationFrame(animate);
+                    };
+                    animate();
+                }
+
+                return () => {
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                };
+            }, [angles, selectedValue, isSimulating, height]);
+
+            const handleControl = (command) => {
+                const step = 1;
+                let newAngles = [...angles];
+                let newHeight = height;
+                switch (command) {
+                    case 'Up': newHeight = Math.min(newHeight + step, 100); break;
+                    case 'Down': newHeight = Math.max(newHeight - step, 0); break;
+                    case 'Forward': newAngles[1] = Math.min(newAngles[1] + step, 45); break;
+                    case 'Backward': newAngles[1] = Math.max(newAngles[1] - step, -45); break;
+                    case 'Left': newAngles[0] = Math.max(newAngles[0] - step, -45); break;
+                    case 'Right': newAngles[0] = Math.min(newAngles[0] + step, 45); break;
+                }
+                setAngles(newAngles);
+                setHeight(newHeight);
+            };
+
+            return (
+                <div className="bg-gray-900 p-6 futuristic-border h-[700px] flex flex-col justify-between items-center scan-effect">
+                    <h2 className="text-xl font-bold mb-4 text-[#00FFFF] text-center">SIMULATION GRID</h2>
+                    <canvas ref={canvasRef} width="400" height="400" className="w-[400px] h-[400px]"></canvas>
+                    <div className="gamepad">
+                        <div className="dpad">
+                            <button onClick={() => handleControl('Up')} className="gamepad-button up">Up (Height +)</button>
+                            <button onClick={() => handleControl('Left')} className="gamepad-button left">Left (Roll -)</button>
+                            <button onClick={() => handleControl('Down')} className="gamepad-button down">Down (Height -)</button>
+                            <button onClick={() => handleControl('Right')} className="gamepad-button right">Right (Roll +)</button>
+                        </div>
+                        <div className="gamepad-row">
+                            <button onClick={() => handleControl('Forward')} className="gamepad-button">Forward (Pitch -)</button>
+                            <button onClick={() => handleControl('Backward')} className="gamepad-button">Backward (Pitch +)</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [editorContent, setEditorContent] = React.useState('');
+            const [status, setStatus] = React.useState('Checking Drone...');
+            const [selectedType, setSelectedType] = React.useState('');
+            const [selectedValue, setSelectedValue] = React.useState('');
+            const [buildOutput, setBuildOutput] = React.useState('');
+            const [isSimulating, setIsSimulating] = React.useState(false);
+            const [activeTab, setActiveTab] = React.useState('Fateh V1.0');
+            const [angles, setAngles] = React.useState([0, 0, 0]);
+            const [height, setHeight] = React.useState(0);
+            const [lastBuiltCode, setLastBuiltCode] = React.useState(localStorage.getItem('lastBuiltCode') || '');
+            const [logicInput, setLogicInput] = React.useState('');
+            const editorRef = React.useRef(null);
+
+            React.useEffect(() => {
+                let isMounted = true;
+
+                async function initialize() {
+                    try {
+                        const response = await axios.get('http://localhost:3000/code/Fateh V1.0', { timeout: 5000 });
+                        if (isMounted && response.data.success) {
+                            setStatus('Latest code fetched');
+                            setEditorContent(response.data.code);
+                            window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
+                            window.require(['vs/editor/editor.main'], () => {
+                                if (!isMounted || !document.getElementById('editor')) return;
+                                if (editorRef.current) editorRef.current.dispose();
+                                editorRef.current = monaco.editor.create(document.getElementById('editor'), {
+                                    value: response.data.code,
+                                    language: 'python',
+                                    theme: 'vs-dark',
+                                    automaticLayout: true,
+                                    fontFamily: 'monospace',
+                                    fontSize: 14,
+                                    lineNumbers: 'on',
+                                    minimap: { enabled: false }
+                                });
+                                editorRef.current.onDidChangeModelContent(() => {
+                                    setEditorContent(editorRef.current.getValue());
+                                });
+                            }, (err) => {
+                                console.error('Error loading Monaco Editor:', err);
+                                if (isMounted) setStatus('Error: Editor failed to load');
+                            });
+                        } else {
+                            throw new Error('Invalid response from server');
+                        }
+                    } catch (error) {
+                        if (isMounted) {
+                            setStatus(`Error fetching code: ${error.message}`);
+                            console.error('Code fetch failed:', error);
+                        }
+                    }
+                }
+                initialize();
+
+                return () => {
+                    isMounted = false;
+                    if (editorRef.current) {
+                        editorRef.current.dispose();
+                        editorRef.current = null;
+                    }
+                };
+            }, []);
+
+            const handleTabChange = async (tab) => {
+                setActiveTab(tab);
+                if (tab === 'Write Your Own Logic') {
+                    setEditorContent(logicInput);
+                    if (editorRef.current) {
+                        editorRef.current.setValue(logicInput);
+                    }
+                } else if (tab === 'Fateh V1.0') {
+                    setStatus('Fetching Code...');
+                    try {
+                        const response = await axios.get('http://localhost:3000/code/Fateh V1.0', { timeout: 5000 });
+                        if (response.data.success) {
+                            setEditorContent(response.data.code);
+                            if (editorRef.current) {
+                                editorRef.current.setValue(response.data.code);
+                            }
+                            setStatus('Latest code fetched');
+                        } else {
+                            setStatus('Error: Failed to fetch code');
+                        }
+                    } catch (error) {
+                        setStatus(`Error fetching code: ${error.message}`);
+                        console.error('Code fetch failed:', error);
+                    }
+                }
+            };
+
+            const uploadCode = async () => {
+                if (!lastBuiltCode) {
+                    setStatus('Error: No successfully built code to deploy');
+                    return;
+                }
+                setStatus('Checking drone connection...');
+                try {
+                    const checkResponse = await axios.get('http://192.168.4.1:8080/ping', { timeout: 3000 });
+                    if (checkResponse.data && checkResponse.data.status === 'connected') {
+                        setStatus('Uploading...');
+                        const uploadResponse = await axios.post('http://192.168.4.1:8080/upload', lastBuiltCode, { timeout: 5000 });
+                        setStatus('Code uploaded');
+                    } else {
+                        setStatus('Drone is not connected');
+                    }
+                } catch (error) {
+                    setStatus('Drone is not connected');
+                    console.error('Upload failed:', error);
+                } finally {
+                    setTimeout(() => setStatus('OPERATIONAL'), 3000);
+                }
+            };
+
+            const buildCode = async () => {
+                setStatus('Building...');
+                setBuildOutput('');
+                try {
+                    const fullCode = editorContent;
+                    const response = await axios.post('http://localhost:3000/build', { customCode: fullCode }, { timeout: 5000 });
+                    console.log('Build response:', response.data);
+                    if (response.data.success) {
+                        setBuildOutput(`Build successful:\n${response.data.output}`);
+                        setLastBuiltCode(fullCode);
+                        localStorage.setItem('lastBuiltCode', fullCode);
+                    } else {
+                        setBuildOutput(`Build failed:\n${response.data.error}`);
+                    }
+                } catch (error) {
+                    setBuildOutput(`Error: ${error.message || 'Server unavailable'}`);
+                } finally {
+                    setTimeout(() => setStatus('OPERATIONAL'), 2000);
+                }
+            };
+
+            const createSimulation = async () => {
+                if (buildOutput.startsWith('Error') || buildOutput === '') {
+                    setStatus('Error: Build code first without errors');
+                    return;
+                }
+                setStatus('Creating Simulation...');
+                setIsSimulating(true);
+                setStatus('Simulation Created');
+            };
+
+            const startSimulation = () => {
+                setIsSimulating(true);
+                setStatus('Simulation Running');
+            };
+
+            const convertLogicToCode = () => {
+                setStatus('Converting...');
+                let convertedCode = `# Converted from logic: ${logicInput}\n`;
+
+                try {
+                    const input = logicInput.toLowerCase().trim();
+                    if (!input) {
+                        throw new Error('No logic provided');
+                    }
+
+                    if (input.startsWith('if')) {
+                        const conditionMatch = input.match(/if\s+(.+?),\s*(.+)/);
+                        if (!conditionMatch) {
+                            throw new Error('Invalid condition format. Use: "If [condition], [action]"');
+                        }
+                        const [_, condition, action] = conditionMatch;
+
+                        let pythonCondition = '';
+                        if (condition.includes('height')) {
+                            const heightMatch = condition.match(/height\s*([><=])\s*(\d+)\s*(meters)?/);
+                            if (heightMatch) {
+                                const [_, operator, value] = heightMatch;
+                                pythonCondition = `height ${operator} ${value}`;
+                            }
+                        } else {
+                            throw new Error('Unsupported variable in condition. Use "height"');
+                        }
+
+                        let pythonAction = '';
+                        if (action.includes('reduce motor speed by')) {
+                            const speedMatch = action.match(/reduce motor speed by\s*(\d+)%/);
+                            if (speedMatch) {
+                                const percentage = parseInt(speedMatch[1]) / 100;
+                                pythonAction = `set_motor_speeds(m1 * ${1 - percentage}, m2 * ${1 - percentage}, m3 * ${1 - percentage}, m4 * ${1 - percentage})`;
+                            }
+                        } else if (action.includes('increase motor speed by')) {
+                            const speedMatch = action.match(/increase motor speed by\s*(\d+)%/);
+                            if (speedMatch) {
+                                const percentage = parseInt(speedMatch[1]) / 100;
+                                pythonAction = `set_motor_speeds(m1 * ${1 + percentage}, m2 * ${1 + percentage}, m3 * ${1 + percentage}, m4 * ${1 + percentage})`;
+                            }
+                        } else if (action.includes('set motor speed to')) {
+                            const speedMatch = action.match(/set motor speed to\s*(\d+)/);
+                            if (speedMatch) {
+                                const value = parseInt(speedMatch[1]);
+                                pythonAction = `set_motor_speeds(${value}, ${value}, ${value}, ${value})`;
+                            }
+                        } else {
+                            throw new Error('Unsupported action. Use "reduce/increase motor speed by X%" or "set motor speed to X"');
+                        }
+
+                        convertedCode += `if ${pythonCondition}:\n    ${pythonAction}`;
+                    } else {
+                        throw new Error('Logic must start with "if"');
+                    }
+
+                } catch (error) {
+                    convertedCode += `# Error: ${error.message}`;
+                }
+
+                const updatedContent = editorContent + (editorContent ? '\n\n' : '') + convertedCode;
+                setEditorContent(updatedContent);
+                if (editorRef.current) {
+                    editorRef.current.setValue(updatedContent);
+                }
+                setStatus('Code Converted');
+                setTimeout(() => setStatus('OPERATIONAL'), 2000);
+            };
+
+            return (
+                <div className="container mx-auto p-6 max-w-7xl">
+                    <h1 className="text-4xl font-bold text-center mb-8 text-[#00FFFF] tracking-wider animate-[pulse_3s_infinite]">
+                        AirM Fateh Drone Logic Learner
+                    </h1>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2">
+                            <div id="editor" className="h-[800px] futuristic-border rounded-lg scan-effect"></div>
+                            <div className="mt-4 p-4 bg-gray-700 rounded-lg flex flex-wrap gap-4 items-start">
+                                <button onClick={buildCode}
+                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-2 px-4 rounded-lg futuristic-border animate-[pulse_2s_infinite]">
+                                    BUILD
+                                </button>
+                                <button onClick={createSimulation}
+                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-2 px-4 rounded-lg futuristic-border animate-[pulse_2s_infinite]"
+                                    disabled={buildOutput.startsWith('Error') || buildOutput === ''}>
+                                    CREATE SIMULATION
+                                </button>
+                                {activeTab === 'Write Your Own Logic' && (
+                                    <button onClick={convertLogicToCode}
+                                        className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-2 px-4 rounded-lg futuristic-border animate-[pulse_2s_infinite]">
+                                        CONVERT TO CODE
+                                    </button>
+                                )}
+                                <pre className="mt-2 text-[#00FFFF] whitespace-pre-wrap flex-1">{buildOutput}</pre>
+                            </div>
+                            {activeTab === 'Write Your Own Logic' && (
+                                <div className="mt-4 p-4 bg-gray-700 rounded-lg futuristic-border">
+                                    <textarea
+                                        className="w-full h-32 p-2 bg-gray-800 text-[#00FFFF] border border-[#00FF00] rounded-lg resize-none font-mono"
+                                        placeholder="Write your logic here (e.g., 'If height > 10 meters, reduce motor speed by 10%')"
+                                        value={logicInput}
+                                        onChange={(e) => setLogicInput(e.target.value)}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        <div className="space-y-6">
+                            <Tabs activeTab={activeTab} onTabChange={handleTabChange} />
+                            <SimulationWindow 
+                                selectedType={selectedType}
+                                selectedValue={selectedValue}
+                                isSimulating={isSimulating}
+                                setIsSimulating={setIsSimulating}
+                                angles={angles}
+                                setAngles={setAngles}
+                                height={height}
+                                setHeight={setHeight}
+                            />
+                        </div>
+                    </div>
+                    <div className="mt-6 flex flex-col items-center gap-6">
+                        <AnimationWindow status={status} />
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="flex gap-4">
+                                <button onClick={startSimulation}
+                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-3 px-6 rounded-lg futuristic-border animate-[pulse_2s_infinite]">
+                                    SIMULATE
+                                </button>
+                                <button onClick={uploadCode}
+                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-3 px-6 rounded-lg futuristic-border animate-[pulse_2s_infinite]"
+                                    disabled={!lastBuiltCode}>
+                                    DEPLOY PROTOCOL
+                                </button>
+                            </div>
+                            <p className="text-sm text-[#00FFFF] italic text-center">
+                                *Note: Before transferring the code to the drone, please connect to the drone WiFi network.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
