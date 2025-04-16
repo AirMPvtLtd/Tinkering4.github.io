@@ -219,8 +219,8 @@
         }
 
         function App() {
-            const [editorContent, setEditorContent] = React.useState('');
-            const [status, setStatus] = React.useState('Checking Drone...');
+            const [editorContent, setEditorContent] = React.useState('# Sample Python code\nprint("Hello, Drone!")');
+            const [status, setStatus] = React.useState('Initializing Editor...');
             const [selectedType, setSelectedType] = React.useState('');
             const [selectedValue, setSelectedValue] = React.useState('');
             const [buildOutput, setBuildOutput] = React.useState('');
@@ -237,40 +237,48 @@
 
                 async function initialize() {
                     try {
+                        // Attempt to fetch initial code from server
                         const response = await axios.get('http://localhost:3000/code/Fateh V1.0', { timeout: 5000 });
                         if (isMounted && response.data.success) {
-                            setStatus('Latest code fetched');
                             setEditorContent(response.data.code);
-                            window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
-                            window.require(['vs/editor/editor.main'], () => {
-                                if (!isMounted || !document.getElementById('editor')) return;
-                                if (editorRef.current) editorRef.current.dispose();
-                                editorRef.current = monaco.editor.create(document.getElementById('editor'), {
-                                    value: response.data.code,
-                                    language: 'python',
-                                    theme: 'vs-dark',
-                                    automaticLayout: true,
-                                    fontFamily: 'monospace',
-                                    fontSize: 14,
-                                    lineNumbers: 'on',
-                                    minimap: { enabled: false }
-                                });
-                                editorRef.current.onDidChangeModelContent(() => {
-                                    setEditorContent(editorRef.current.getValue());
-                                });
-                            }, (err) => {
-                                console.error('Error loading Monaco Editor:', err);
-                                if (isMounted) setStatus('Error: Editor failed to load');
-                            });
+                            setStatus('Latest code fetched');
                         } else {
                             throw new Error('Invalid response from server');
                         }
                     } catch (error) {
                         if (isMounted) {
-                            setStatus(`Error fetching code: ${error.message}`);
+                            setStatus(`Error fetching code: ${error.message}. Using default content.`);
                             console.error('Code fetch failed:', error);
                         }
                     }
+
+                    // Initialize Monaco Editor
+                    window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
+                    window.require(['vs/editor/editor.main'], () => {
+                        if (!isMounted || !document.getElementById('editor')) {
+                            console.error('Editor container not found');
+                            if (isMounted) setStatus('Error: Editor container not found');
+                            return;
+                        }
+                        if (editorRef.current) editorRef.current.dispose();
+                        editorRef.current = monaco.editor.create(document.getElementById('editor'), {
+                            value: editorContent,
+                            language: 'python',
+                            theme: 'vs-dark',
+                            automaticLayout: true,
+                            fontFamily: 'monospace',
+                            fontSize: 14,
+                            lineNumbers: 'on',
+                            minimap: { enabled: false }
+                        });
+                        editorRef.current.onDidChangeModelContent(() => {
+                            setEditorContent(editorRef.current.getValue());
+                        });
+                        if (isMounted) setStatus('Editor Initialized');
+                    }, (err) => {
+                        console.error('Error loading Monaco Editor:', err);
+                        if (isMounted) setStatus('Error: Failed to load Monaco Editor');
+                    });
                 }
                 initialize();
 
@@ -286,9 +294,9 @@
             const handleTabChange = async (tab) => {
                 setActiveTab(tab);
                 if (tab === 'Write Your Own Logic') {
-                    setEditorContent(logicInput);
+                    setEditorContent(logicInput || '# Write your logic below\n');
                     if (editorRef.current) {
-                        editorRef.current.setValue(logicInput);
+                        editorRef.current.setValue(logicInput || '# Write your logic below\n');
                     }
                 } else if (tab === 'Fateh V1.0') {
                     setStatus('Fetching Code...');
@@ -339,7 +347,6 @@
                 try {
                     const fullCode = editorContent;
                     const response = await axios.post('http://localhost:3000/build', { customCode: fullCode }, { timeout: 5000 });
-                    console.log('Build response:', response.data);
                     if (response.data.success) {
                         setBuildOutput(`Build successful:\n${response.data.output}`);
                         setLastBuiltCode(fullCode);
@@ -374,57 +381,61 @@
                 let convertedCode = `# Converted from logic: ${logicInput}\n`;
 
                 try {
-                    const input = logicInput.toLowerCase().trim();
+                    const input = logicInput.trim().toLowerCase();
                     if (!input) {
                         throw new Error('No logic provided');
                     }
 
-                    if (input.startsWith('if')) {
-                        const conditionMatch = input.match(/if\s+(.+?),\s*(.+)/);
-                        if (!conditionMatch) {
-                            throw new Error('Invalid condition format. Use: "If [condition], [action]"');
-                        }
-                        const [_, condition, action] = conditionMatch;
-
-                        let pythonCondition = '';
-                        if (condition.includes('height')) {
-                            const heightMatch = condition.match(/height\s*([><=])\s*(\d+)\s*(meters)?/);
-                            if (heightMatch) {
-                                const [_, operator, value] = heightMatch;
-                                pythonCondition = `height ${operator} ${value}`;
-                            }
-                        } else {
-                            throw new Error('Unsupported variable in condition. Use "height"');
-                        }
-
-                        let pythonAction = '';
-                        if (action.includes('reduce motor speed by')) {
-                            const speedMatch = action.match(/reduce motor speed by\s*(\d+)%/);
-                            if (speedMatch) {
-                                const percentage = parseInt(speedMatch[1]) / 100;
-                                pythonAction = `set_motor_speeds(m1 * ${1 - percentage}, m2 * ${1 - percentage}, m3 * ${1 - percentage}, m4 * ${1 - percentage})`;
-                            }
-                        } else if (action.includes('increase motor speed by')) {
-                            const speedMatch = action.match(/increase motor speed by\s*(\d+)%/);
-                            if (speedMatch) {
-                                const percentage = parseInt(speedMatch[1]) / 100;
-                                pythonAction = `set_motor_speeds(m1 * ${1 + percentage}, m2 * ${1 + percentage}, m3 * ${1 + percentage}, m4 * ${1 + percentage})`;
-                            }
-                        } else if (action.includes('set motor speed to')) {
-                            const speedMatch = action.match(/set motor speed to\s*(\d+)/);
-                            if (speedMatch) {
-                                const value = parseInt(speedMatch[1]);
-                                pythonAction = `set_motor_speeds(${value}, ${value}, ${value}, ${value})`;
-                            }
-                        } else {
-                            throw new Error('Unsupported action. Use "reduce/increase motor speed by X%" or "set motor speed to X"');
-                        }
-
-                        convertedCode += `if ${pythonCondition}:\n    ${pythonAction}`;
-                    } else {
+                    if (!input.startsWith('if')) {
                         throw new Error('Logic must start with "if"');
                     }
 
+                    const conditionMatch = input.match(/if\s+(.+?),\s*(.+)/);
+                    if (!conditionMatch) {
+                        throw new Error('Invalid format. Use: "If [condition], [action]"');
+                    }
+
+                    const [_, condition, action] = conditionMatch;
+
+                    let pythonCondition = '';
+                    const heightMatch = condition.match(/height\s*([><=])\s*(\d+)\s*(meters)?/);
+                    if (heightMatch) {
+                        const [_, operator, value] = heightMatch;
+                        pythonCondition = `height ${operator} ${value}`;
+                    } else {
+                        throw new Error('Condition must include "height" with >, <, or =');
+                    }
+
+                    let pythonAction = '';
+                    if (action.includes('reduce motor speed by')) {
+                        const speedMatch = action.match(/reduce motor speed by\s*(\d+)%/);
+                        if (speedMatch) {
+                            const percentage = parseInt(speedMatch[1]) / 100;
+                            pythonAction = `set_motor_speeds(m1 * ${1 - percentage}, m2 * ${1 - percentage}, m3 * ${1 - percentage}, m4 * ${1 - percentage})`;
+                        } else {
+                            throw new Error('Invalid action. Specify percentage (e.g., "reduce motor speed by 10%")');
+                        }
+                    } else if (action.includes('increase motor speed by')) {
+                        const speedMatch = action.match(/increase motor speed by\s*(\d+)%/);
+                        if (speedMatch) {
+                            const percentage = parseInt(speedMatch[1]) / 100;
+                            pythonAction = `set_motor_speeds(m1 * ${1 + percentage}, m2 * ${1 + percentage}, m3 * ${1 + percentage}, m4 * ${1 + percentage})`;
+                        } else {
+                            throw new Error('Invalid action. Specify percentage (e.g., "increase motor speed by 10%")');
+                        }
+                    } else if (action.includes('set motor speed to')) {
+                        const speedMatch = action.match(/set motor speed to\s*(\d+)/);
+                        if (speedMatch) {
+                            const value = parseInt(speedMatch[1]);
+                            pythonAction = `set_motor_speeds(${value}, ${value}, ${value}, ${value})`;
+                        } else {
+                            throw new Error('Invalid action. Specify value (e.g., "set motor speed to 100")');
+                        }
+                    } else {
+                        throw new Error('Unsupported action. Use "reduce/increase motor speed by X%" or "set motor speed to X"');
+                    }
+
+                    convertedCode += `if ${pythonCondition}:\n    ${pythonAction}`;
                 } catch (error) {
                     convertedCode += `# Error: ${error.message}`;
                 }
@@ -433,6 +444,9 @@
                 setEditorContent(updatedContent);
                 if (editorRef.current) {
                     editorRef.current.setValue(updatedContent);
+                } else {
+                    console.error('Editor not initialized');
+                    setStatus('Error: Editor not initialized');
                 }
                 setStatus('Code Converted');
                 setTimeout(() => setStatus('OPERATIONAL'), 2000);
@@ -445,7 +459,7 @@
                     </h1>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2">
-                            <div id="editor" className="h-[800px] futuristic-border rounded-lg scan-effect"></div>
+                            <div id="editor" className="h-[800px] w-full futuristic-border rounded-lg scan-effect"></div>
                             <div className="mt-4 p-4 bg-gray-700 rounded-lg flex flex-wrap gap-4 items-start">
                                 <button onClick={buildCode}
                                     className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-2 px-4 rounded-lg futuristic-border animate-[pulse_2s_infinite]">
