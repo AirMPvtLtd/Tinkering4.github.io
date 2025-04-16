@@ -9,35 +9,264 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes pulse { 0% { box-shadow: 0 0 5px #00FF00; } 50% { box-shadow: 0 0 15px #00FF00; } 100% { box-shadow: 0 0 5px #00FF00; } }
-        @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 100% 0; } }
-        @keyframes futuristic-glow { 0% { box-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF; } 50% { box-shadow: 0 0 10px #00FF00, 0 0 20px #00FF00; } 100% { box-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF; } }
-        .futuristic-border { border: 2px solid #00FFFF; box-shadow: 0 0 10px #00FFFF; }
-        .scan-effect { background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), transparent); animation: scan 2s linear infinite; }
-        .futuristic-button { @apply bg-gray-700 text-[#00FFFF] border border-[#00FF00] p-2 rounded-lg transition-all duration-300; box-shadow: 0 0 5px #00FFFF; animation: futuristic-glow 2s infinite; }
-        .futuristic-button:hover { @apply bg-[#00FF00] text-black; box-shadow: 0 0 15px #00FF00; }
-        .futuristic-button.active { @apply bg-[#00FF00] text-black; box-shadow: 0 0 20px #00FF00; }
-        .gamepad { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px; background: rgba(0, 0, 0, 0.5); border-radius: 10px; width: fit-content; margin: 20px auto 0; }
-        .gamepad-row { display: flex; gap: 10px; }
-        .gamepad-button { @apply bg-gray-700 text-[#00FFFF] border border-[#00FF00] p-4 rounded-lg transition-all duration-300; box-shadow: 0 0 5px #00FFFF; cursor: pointer; font-size: 16px; min-width: 80px; text-align: center; }
-        .gamepad-button:hover { @apply bg-[#00FF00] text-black; box-shadow: 0 0 15px #00FF00; }
-        .dpad { display: grid; grid-template-areas: "up up up" "left down right" "empty empty empty"; gap: 5px; }
-        .dpad .up { grid-area: up; }
-        .dpad .left { grid-area: left; }
-        .dpad .down { grid-area: down; }
-        .dpad .right { grid-area: right; }
+        :root {
+            --primary: #00f7ff;
+            --secondary: #ff2d75;
+            --accent: #9c27b0;
+            --dark: #0a0a1a;
+            --darker: #050510;
+            --light: #e0e0ff;
+        }
+        
+        body {
+            background: var(--darker);
+            font-family: 'Roboto Mono', monospace;
+            color: var(--light);
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        .cyber-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(0, 247, 255, 0.1) 0%, transparent 20%),
+                radial-gradient(circle at 80% 70%, rgba(255, 45, 117, 0.1) 0%, transparent 20%),
+                linear-gradient(var(--darker), var(--dark));
+            z-index: -2;
+        }
+        
+        .grid-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 247, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 247, 255, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+            opacity: 0.3;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        @keyframes scanline {
+            0% { background-position: 0 -100vh; }
+            100% { background-position: 0 100vh; }
+        }
+        
+        .cyber-card {
+            background: rgba(10, 10, 26, 0.8);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 247, 255, 0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cyber-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+        
+        .cyber-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 25px rgba(0, 247, 255, 0.5);
+        }
+        
+        .cyber-button {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cyber-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 247, 255, 0.4), transparent);
+            transition: all 0.5s ease;
+        }
+        
+        .cyber-button:hover {
+            background: rgba(0, 247, 255, 0.1);
+            box-shadow: 0 0 10px var(--primary);
+            color: white;
+        }
+        
+        .cyber-button:hover::before {
+            left: 100%;
+        }
+        
+        .cyber-button.active {
+            background: rgba(0, 247, 255, 0.2);
+            box-shadow: 0 0 10px var(--primary);
+        }
+        
+        .cyber-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .cyber-text {
+            color: var(--primary);
+            text-shadow: 0 0 5px var(--primary);
+            font-family: 'Orbitron', sans-serif;
+        }
+        
+        .cyber-text-secondary {
+            color: var(--secondary);
+            text-shadow: 0 0 5px var(--secondary);
+        }
+        
+        .scanlines {
+            position: relative;
+        }
+        
+        .scanlines::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                transparent 0%,
+                transparent 50%,
+                rgba(0, 247, 255, 0.05) 50%,
+                rgba(0, 247, 255, 0.05) 100%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            animation: scanline 4s linear infinite;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-active {
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+        
+        .status-error {
+            background: var(--secondary);
+            box-shadow: 0 0 10px var(--secondary);
+        }
+        
+        .status-warning {
+            background: #ff9800;
+            box-shadow: 0 0 10px #ff9800;
+        }
+        
+        .hologram-container {
+            width: 100%;
+            height: 300px;
+            position: relative;
+            perspective: 1000px;
+        }
+        
+        .hologram-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 247, 255, 0.1) 0%, transparent 50%, rgba(255, 45, 117, 0.1) 100%);
+            z-index: -1;
+        }
+        
+        .tab-indicator {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: var(--primary);
+            transition: all 0.3s ease;
+        }
+        
+        .ai-suggestion {
+            border-left: 2px solid var(--primary);
+            padding: 8px;
+            margin: 4px 0;
+            background: rgba(0, 247, 255, 0.05);
+            font-size: 12px;
+            position: relative;
+        }
+        
+        .ai-suggestion::before {
+            content: 'AI:';
+            color: var(--secondary);
+            margin-right: 5px;
+            font-weight: bold;
+        }
+        
+        .completed-badge {
+            background: rgba(118, 255, 3, 0.2);
+            color: #76ff03;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            display: inline-block;
+            margin-left: 8px;
+        }
     </style>
 </head>
-<body class="bg-gray-800 text-white font-mono">
+<body>
+    <div class="cyber-bg"></div>
+    <div class="grid-pattern"></div>
     <div id="root" class="min-h-screen"></div>
 
     <script type="text/babel">
         function Tab({ label, isActive, onClick }) {
             return (
                 <button
-                    className={`futuristic-button w-full text-left ${isActive ? 'active' : ''}`}
+                    className={`cyber-button text-sm ${isActive ? 'active' : ''}`}
                     onClick={onClick}
                 >
                     {label}
@@ -46,11 +275,11 @@
         }
 
         function Tabs({ activeTab, onTabChange }) {
-            const tabOrder = ['Fateh V1.0', 'Write Your Own Logic'];
+            const tabOrder = ['Fateh V1.0', 'Write Your Own Logic', 'Challenges'];
             return (
-                <div className="bg-gray-900 p-6 futuristic-border h-[200px] flex flex-col justify-start animate-[pulse_2s_infinite]">
-                    <h2 className="text-xl font-bold mb-4 text-[#00FF00] text-center">CODE MODULES</h2>
-                    <div className="flex flex-col gap-2">
+                <div className="space-y-2 relative">
+                    <h3 className="text-md cyber-text mb-4 text-center">CONTROL MODULES</h3>
+                    <div className="space-y-2">
                         {tabOrder.map((tab) => (
                             <Tab
                                 key={tab}
@@ -64,128 +293,174 @@
             );
         }
 
-        function AnimationWindow({ status }) {
-            let animation = null;
-            if (status === 'Uploading...' || status === 'Building...' || status === 'Checking Drone...' || status === 'Creating Simulation...' || status === 'Converting...' || status === 'Fetching Code...') {
-                animation = (
-                    <div className="flex justify-center items-center h-full">
-                        <div className="w-12 h-12 border-4 border-[#00FFFF] border-t-transparent rounded-full animate-[spin_1s_linear_infinite]"></div>
-                    </div>
-                );
-            } else if (status === 'Code uploaded' || status === 'Simulation Created' || status === 'Code Converted' || status === 'Latest code fetched') {
-                animation = (
-                    <div className="flex justify-center items-center h-full">
-                        <svg className="w-12 h-12 text-[#00FF00] animate-[pulse_1s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                );
-            } else if (status.startsWith('Error') || status === 'Drone server not reachable' || status === 'Drone is not connected') {
-                animation = (
-                    <div className="flex justify-center items-center h-full">
-                        <svg className="w-12 h-12 text-red-500 animate-[pulse_1s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </div>
-                );
+        function StatusIndicator({ status }) {
+            let indicatorClass = "status-indicator ";
+            if (status.includes('Error') || status.includes('failed')) {
+                indicatorClass += "status-error";
+            } else if (status.includes('...') || status.includes('ing')) {
+                indicatorClass += "status-warning";
+            } else {
+                indicatorClass += "status-active";
             }
+            
             return (
-                <div className="bg-gray-900 p-6 futuristic-border h-[150px] flex flex-col justify-center items-center scan-effect">
-                    <h2 className="text-xl font-bold mb-4 text-[#00FFFF] text-center">SYSTEM STATUS</h2>
-                    {animation || <p className="text-[#00FF00] text-center">{status}</p>}
+                <div className="flex items-center">
+                    <span className={indicatorClass}></span>
+                    <span className="text-xs">{status}</span>
                 </div>
             );
         }
 
         function SimulationWindow({ selectedType, selectedValue, isSimulating, setIsSimulating, angles, setAngles, height, setHeight }) {
-            const canvasRef = React.useRef(null);
+            const containerRef = React.useRef(null);
+            const [error, setError] = React.useState(null);
 
             React.useEffect(() => {
-                const canvas = canvasRef.current;
-                if (!canvas) return;
-
-                const ctx = canvas.getContext('2d');
-                const centerX = canvas.width / 2;
-                const centerY = canvas.height / 2;
-                const radius = canvas.width / 2;
-                let animationFrameId;
-
-                const drawHorizon = (roll = 0, pitch = 0, yaw = 0) => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, radius * 0.8, 0, Math.PI * 2);
-                    ctx.stroke();
-                    ctx.save();
-                    ctx.translate(centerX, centerY);
-                    ctx.rotate(roll * Math.PI / 180);
-                    ctx.rotate(pitch * Math.PI / 180);
-                    const horizonRadius = radius * 0.7;
-                    ctx.fillStyle = 'rgb(0, 191, 255)';
-                    ctx.beginPath();
-                    ctx.arc(0, 0, horizonRadius, 0, Math.PI, true);
-                    ctx.fill();
-                    ctx.fillStyle = 'rgb(139, 69, 19)';
-                    ctx.beginPath();
-                    ctx.arc(0, 0, horizonRadius, 0, Math.PI, false);
-                    ctx.fill();
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, horizonRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                    ctx.lineWidth = 1;
-                    for (let i = -90; i <= 90; i += 10) {
-                        const baseAngle = (i / 90) * Math.PI / 2;
-                        const rotatedAngle = baseAngle - Math.PI / 2;
-                        const lineRadius = horizonRadius * 0.6;
-                        const y = Math.sin(rotatedAngle) * lineRadius;
-                        const x = Math.cos(rotatedAngle) * lineRadius;
-                        if (i !== 0) {
-                            ctx.beginPath();
-                            ctx.moveTo(-5, y);
-                            ctx.lineTo(5, y);
-                            ctx.stroke();
-                            ctx.fillStyle = '#ffffff';
-                            ctx.font = '10px monospace';
-                            ctx.save();
-                            ctx.translate(x, y);
-                            ctx.rotate(-roll * Math.PI / 180 - pitch * Math.PI / 180 - Math.PI / 2);
-                            ctx.fillText(`${i}°`, 10, 2);
-                            ctx.restore();
-                        }
-                    }
-                    ctx.restore();
-                    ctx.fillStyle = 'rgb(0, 255, 255)';
-                    ctx.font = '16px monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(`TARGET: ${selectedValue || 'NONE'}`, centerX, centerY - radius * 0.8 - 20);
-                    ctx.fillText(`Roll: ${roll.toFixed(1)}°`, centerX, centerY + radius * 0.8 + 20);
-                    ctx.fillText(`Pitch: ${pitch.toFixed(1)}°`, centerX, centerY + radius * 0.8 + 40);
-                    ctx.fillText(`Height: ${height} meters`, centerX, centerY + radius * 0.8 + 60);
-                    ctx.fillText(`Yaw: ${yaw.toFixed(1)}°`, centerX, centerY + radius * 0.8 + 80);
-                };
-
-                drawHorizon(angles[0], angles[1], angles[2]);
-
-                if (isSimulating) {
-                    const animate = () => {
-                        drawHorizon(angles[0], angles[1], angles[2]);
-                        animationFrameId = requestAnimationFrame(animate);
-                    };
-                    animate();
+                if (typeof THREE === 'undefined') {
+                    console.error('Three.js not loaded');
+                    setError('Failed to load 3D simulation');
+                    return;
                 }
 
-                return () => {
-                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                const container = containerRef.current;
+                if (!container) return;
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, container.clientWidth / 300, 0.1, 1000);
+                camera.position.set(0, 2, 5);
+                camera.lookAt(0, 0, 0);
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(container.clientWidth, 300);
+                renderer.setClearColor(0x000000, 0);
+                container.appendChild(renderer.domElement);
+
+                // Create drone with more detailed geometry
+                const droneGroup = new THREE.Group();
+                
+                // Main body
+                const bodyGeometry = new THREE.BoxGeometry(0.5, 0.2, 0.5);
+                const bodyMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0x00f7ff,
+                    emissive: 0x006064,
+                    specular: 0x00bcd4,
+                    shininess: 30,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                droneGroup.add(body);
+                
+                // Arms
+                const armGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 8);
+                const armMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0x9c27b0,
+                    emissive: 0x4a148c,
+                    specular: 0xce93d8,
+                    shininess: 20
+                });
+                
+                for (let i = 0; i < 4; i++) {
+                    const arm = new THREE.Mesh(armGeometry, armMaterial);
+                    arm.position.set(
+                        0.5 * Math.cos((i * Math.PI) / 2),
+                        0,
+                        0.5 * Math.sin((i * Math.PI) / 2)
+                    );
+                    arm.rotation.x = Math.PI / 2;
+                    arm.rotation.y = (i * Math.PI) / 2;
+                    droneGroup.add(arm);
+                }
+                
+                // Propellers
+                const propGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.02, 16);
+                const propMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xff2d75,
+                    emissive: 0xc2185b,
+                    specular: 0xff80ab,
+                    shininess: 50,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                for (let i = 0; i < 4; i++) {
+                    const prop = new THREE.Mesh(propGeometry, propMaterial);
+                    prop.position.set(
+                        0.7 * Math.cos((i * Math.PI) / 2),
+                        0.1,
+                        0.7 * Math.sin((i * Math.PI) / 2)
+                    );
+                    droneGroup.add(prop);
+                }
+                
+                // Add some decorative elements
+                const centerGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+                const centerMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x00f7ff,
+                    emissive: 0x006064,
+                    specular: 0x00bcd4,
+                    shininess: 100
+                });
+                const center = new THREE.Mesh(centerGeometry, centerMaterial);
+                droneGroup.add(center);
+
+                scene.add(droneGroup);
+
+                // Enhanced lighting
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+                scene.add(ambientLight);
+                
+                const pointLight1 = new THREE.PointLight(0x00f7ff, 1, 10);
+                pointLight1.position.set(2, 3, 2);
+                scene.add(pointLight1);
+                
+                const pointLight2 = new THREE.PointLight(0xff2d75, 1, 10);
+                pointLight2.position.set(-2, 3, -2);
+                scene.add(pointLight2);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+                directionalLight.position.set(0, 1, 0);
+                scene.add(directionalLight);
+
+                // Add a grid helper
+                const gridHelper = new THREE.GridHelper(10, 10, 0x00f7ff, 0x00f7ff);
+                gridHelper.position.y = -0.5;
+                scene.add(gridHelper);
+
+                let animationFrameId;
+                const animate = () => {
+                    if (isSimulating) {
+                        droneGroup.rotation.x = angles[1] * (Math.PI / 180);
+                        droneGroup.rotation.z = -angles[0] * (Math.PI / 180);
+                        droneGroup.rotation.y = angles[2] * (Math.PI / 180);
+                        droneGroup.position.y = height * 0.1;
+                        
+                        // Animate propellers
+                        droneGroup.children.forEach((child, index) => {
+                            if (index >= 5 && index <= 8) { // Propellers
+                                child.rotation.z += 0.2 * (1 + height * 0.05);
+                            }
+                        });
+                    }
+                    renderer.render(scene, camera);
+                    animationFrameId = requestAnimationFrame(animate);
                 };
-            }, [angles, selectedValue, isSimulating, height]);
+                animate();
+
+                return () => {
+                    cancelAnimationFrame(animationFrameId);
+                    renderer.dispose();
+                    if (container.contains(renderer.domElement)) {
+                        container.removeChild(renderer.domElement);
+                    }
+                };
+            }, [isSimulating, angles, height]);
 
             const handleControl = (command) => {
                 const step = 1;
                 let newAngles = [...angles];
                 let newHeight = height;
+                
                 switch (command) {
                     case 'Up': newHeight = Math.min(newHeight + step, 100); break;
                     case 'Down': newHeight = Math.max(newHeight - step, 0); break;
@@ -193,25 +468,160 @@
                     case 'Backward': newAngles[1] = Math.max(newAngles[1] - step, -45); break;
                     case 'Left': newAngles[0] = Math.max(newAngles[0] - step, -45); break;
                     case 'Right': newAngles[0] = Math.min(newAngles[0] + step, 45); break;
+                    case 'Yaw Left': newAngles[2] = (newAngles[2] - step) % 360; break;
+                    case 'Yaw Right': newAngles[2] = (newAngles[2] + step) % 360; break;
+                    case 'Reset': 
+                        newAngles = [0, 0, 0];
+                        newHeight = 0;
+                        break;
                 }
+                
                 setAngles(newAngles);
                 setHeight(newHeight);
             };
 
+            if (error) {
+                return (
+                    <div className="cyber-card p-4 h-[400px] flex flex-col justify-center items-center">
+                        <h2 className="text-md cyber-text mb-2">SIMULATION ERROR</h2>
+                        <p className="cyber-text-secondary text-sm">{error}</p>
+                    </div>
+                );
+            }
+
             return (
-                <div className="bg-gray-900 p-6 futuristic-border h-[700px] flex flex-col justify-between items-center scan-effect">
-                    <h2 className="text-xl font-bold mb-4 text-[#00FFFF] text-center">SIMULATION GRID</h2>
-                    <canvas ref={canvasRef} width="400" height="400" className="w-[400px] h-[400px]"></canvas>
-                    <div className="gamepad">
-                        <div className="dpad">
-                            <button onClick={() => handleControl('Up')} className="gamepad-button up">Up (Height +)</button>
-                            <button onClick={() => handleControl('Left')} className="gamepad-button left">Left (Roll -)</button>
-                            <button onClick={() => handleControl('Down')} className="gamepad-button down">Down (Height -)</button>
-                            <button onClick={() => handleControl('Right')} className="gamepad-button right">Right (Roll +)</button>
+                <div className="cyber-card p-4 h-[400px] flex flex-col items-center">
+                    <h2 className="text-md cyber-text mb-4">DRONE SIMULATOR</h2>
+                    <div className="hologram-container scanlines" ref={containerRef}></div>
+                    
+                    <div className="grid grid-cols-3 gap-2 mt-4 w-full">
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">TARGET</p>
+                            <p className="cyber-text text-sm">{selectedValue || 'NONE'}</p>
                         </div>
-                        <div className="gamepad-row">
-                            <button onClick={() => handleControl('Forward')} className="gamepad-button">Forward (Pitch -)</button>
-                            <button onClick={() => handleControl('Backward')} className="gamepad-button">Backward (Pitch +)</button>
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">ALTITUDE</p>
+                            <p className="cyber-text text-sm">{height.toFixed(1)}m</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">STATUS</p>
+                            <p className="cyber-text text-sm">{isSimulating ? 'ACTIVE' : 'STANDBY'}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-1 mt-2 w-full">
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">ROLL</p>
+                            <p className="cyber-text text-sm">{angles[0].toFixed(1)}°</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">PITCH</p>
+                            <p className="cyber-text text-sm">{angles[1].toFixed(1)}°</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">YAW</p>
+                            <p className="cyber-text text-sm">{angles[2].toFixed(1)}°</p>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-5 gap-1 mt-4 w-full">
+                        <button onClick={() => handleControl('Up')} className="cyber-button">↑</button>
+                        <button onClick={() => handleControl('Left')} className="cyber-button">←</button>
+                        <button onClick={() => handleControl('Reset')} className="cyber-button">⏻</button>
+                        <button onClick={() => handleControl('Right')} className="cyber-button">→</button>
+                        <button onClick={() => handleControl('Down')} className="cyber-button">↓</button>
+                        
+                        <button onClick={() => handleControl('Forward')} className="cyber-button col-span-2">FWD</button>
+                        <button onClick={() => handleControl('Yaw Left')} className="cyber-button">↶</button>
+                        <button onClick={() => handleControl('Yaw Right')} className="cyber-button col-span-2">↷</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function ChallengesWindow({ challenges, userProgress, onChallengeSelect, checkChallenge }) {
+            const [isOpen, setIsOpen] = React.useState(true);
+            
+            return (
+                <div className="cyber-card">
+                    <button
+                        className="cyber-button w-full text-left flex justify-between items-center"
+                        onClick={() => setIsOpen(!isOpen)}
+                    >
+                        <span>CHALLENGES</span>
+                        <span>{isOpen ? '▲' : '▼'}</span>
+                    </button>
+                    
+                    <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-[500px]' : 'max-h-0'}`}>
+                        <div className="p-3 space-y-3">
+                            {challenges.map((challenge) => (
+                                <div
+                                    key={challenge.id}
+                                    className={`cyber-card p-3 ${userProgress[challenge.id]?.completed ? 'border-green-500' : ''}`}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <h3 className="text-sm cyber-text">{challenge.title}</h3>
+                                        {userProgress[challenge.id]?.completed && (
+                                            <span className="completed-badge">COMPLETED</span>
+                                        )}
+                                    </div>
+                                    
+                                    <p className="text-gray-300 text-xs mt-1">{challenge.description}</p>
+                                    <p className="cyber-text-secondary text-xs mt-1">REWARD: {challenge.points} CREDITS</p>
+                                    
+                                    <div className="flex gap-2 mt-2">
+                                        {!userProgress[challenge.id]?.completed && (
+                                            <button
+                                                className="cyber-button text-xs"
+                                                onClick={() => onChallengeSelect(challenge)}
+                                            >
+                                                START
+                                            </button>
+                                        )}
+                                        
+                                        {!userProgress[challenge.id]?.completed && userProgress[challenge.id]?.attempted && (
+                                            <button
+                                                className="cyber-button text-xs"
+                                                onClick={() => checkChallenge(challenge)}
+                                            >
+                                                VERIFY
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function LeaderboardWindow({ leaderboard }) {
+            const [isOpen, setIsOpen] = React.useState(true);
+            
+            return (
+                <div className="cyber-card mt-4">
+                    <button
+                        className="cyber-button w-full text-left flex justify-between items-center"
+                        onClick={() => setIsOpen(!isOpen)}
+                    >
+                        <span>LEADERBOARD</span>
+                        <span>{isOpen ? '▲' : '▼'}</span>
+                    </button>
+                    
+                    <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-[500px]' : 'max-h-0'}`}>
+                        <div className="p-3 space-y-2">
+                            {leaderboard.map((entry, index) => (
+                                <div key={index} className="flex justify-between items-center cyber-card p-2">
+                                    <div className="flex items-center">
+                                        <span className="text-xs text-gray-400 mr-2">#{index + 1}</span>
+                                        <span className={`text-xs ${entry.name === 'You' ? 'cyber-text' : 'text-gray-300'}`}>
+                                            {entry.name}
+                                        </span>
+                                    </div>
+                                    <span className="cyber-text-secondary text-xs">{entry.score} CR</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -219,8 +629,8 @@
         }
 
         function App() {
-            const [editorContent, setEditorContent] = React.useState('# Sample Python code\nprint("Hello, Drone!")');
-            const [status, setStatus] = React.useState('Initializing Editor...');
+            const [editorContent, setEditorContent] = React.useState('');
+            const [status, setStatus] = React.useState('Initializing...');
             const [selectedType, setSelectedType] = React.useState('');
             const [selectedValue, setSelectedValue] = React.useState('');
             const [buildOutput, setBuildOutput] = React.useState('');
@@ -230,56 +640,200 @@
             const [height, setHeight] = React.useState(0);
             const [lastBuiltCode, setLastBuiltCode] = React.useState(localStorage.getItem('lastBuiltCode') || '');
             const [logicInput, setLogicInput] = React.useState('');
+            const [aiSuggestions, setAiSuggestions] = React.useState([]);
+            const [challenges, setChallenges] = React.useState([
+                {
+                    id: 1,
+                    title: 'STABLE HOVER',
+                    description: 'Maintain drone at 1m altitude for 30 seconds with minimal tilt',
+                    points: 100,
+                    criteria: { height: 1, rollMax: 5, pitchMax: 5, duration: 30 }
+                },
+                {
+                    id: 2,
+                    title: 'PRECISE ASCENT',
+                    description: 'Ascend to 2m altitude in 10 seconds with controlled movement',
+                    points: 150,
+                    criteria: { height: 2, rollMax: 10, pitchMax: 10, duration: 10 }
+                },
+                {
+                    id: 3,
+                    title: 'SOFT LANDING',
+                    description: 'Descend from 1m altitude and land smoothly',
+                    points: 200,
+                    criteria: { height: 0, rollMax: 3, pitchMax: 3, duration: 15 }
+                }
+            ]);
+            
+            const [userProgress, setUserProgress] = React.useState({});
+            const [leaderboard, setLeaderboard] = React.useState([
+                { name: 'DRONE_MASTER', score: 450 },
+                { name: 'SKY_COMMANDER', score: 350 },
+                { name: 'AERO_TECH', score: 250 },
+                { name: 'You', score: 0 }
+            ]);
+            
+            const [serverAvailable, setServerAvailable] = React.useState(true);
             const editorRef = React.useRef(null);
+
+            const modeTemplate = `
+# DRONE CONTROL FUNCTION
+# This function calculates motor outputs based on PID controllers
+# Parameters:
+#   pids: List of PID controllers [roll_pid, pitch_pid, yaw_pid]
+#   throttle: Throttle percentage (0-100)
+#   angles: Current angles [roll, pitch, yaw] in degrees
+#   targets: Target angles [roll, pitch, yaw] in degrees
+#   dt: Time delta since last update in seconds
+
+def mode(pids, throttle, angles, targets, dt):
+    # PID gains - tune these for optimal performance
+    kp = 1.0    # Proportional gain
+    ki = 0.05   # Integral gain
+    kd = 0.2    # Derivative gain
+    
+    # Base throttle value (50% of max at 100% throttle input)
+    throttle_base = 65535 * 0.5
+    
+    # Maximum allowed tilt angle (degrees)
+    max_angle = 45
+    
+    # Set PID controller gains
+    pids[0].set_gains(kp, ki, kd)  # Roll
+    pids[1].set_gains(kp, ki, kd)  # Pitch
+    pids[2].set_gains(kp/2, ki, kd) # Yaw (less aggressive)
+    
+    # Calculate base motor speed (clamped to minimum 25%)
+    base = max(throttle * throttle_base / 100, 65535 * 0.25)
+    
+    # Update PID controllers and get correction values
+    roll_correction = pids[0].update(targets[0], angles[0], dt)
+    pitch_correction = pids[1].update(targets[1], angles[1], dt)
+    yaw_correction = pids[2].update(targets[2], angles[2], dt)
+    
+    # Calculate motor outputs (front-left, front-right, rear-left, rear-right)
+    return (
+        base + pitch_correction + roll_correction + yaw_correction,   # FL
+        base + pitch_correction - roll_correction - yaw_correction,   # FR
+        base - pitch_correction + roll_correction - yaw_correction,   # RL
+        base - pitch_correction - roll_correction + yaw_correction    # RR
+    )
+`;
+
+            const defaultFatehCode = `
+# FATEH V1.0 DEFAULT CONTROL SYSTEM
+# Welcome to the Fateh drone programming interface
+
+def mode(pids, throttle, angles, targets, dt):
+    # Basic control - all motors at equal speed
+    motor_speed = 65535 * (throttle / 100)
+    return (motor_speed, motor_speed, motor_speed, motor_speed)
+`;
 
             React.useEffect(() => {
                 let isMounted = true;
+                let retryCount = 0;
+                const maxRetries = 5;
 
-                async function initialize() {
-                    try {
-                        // Attempt to fetch initial code from server
-                        const response = await axios.get('http://localhost:3000/code/Fateh V1.0', { timeout: 5000 });
-                        if (isMounted && response.data.success) {
-                            setEditorContent(response.data.code);
-                            setStatus('Latest code fetched');
-                        } else {
-                            throw new Error('Invalid response from server');
-                        }
-                    } catch (error) {
-                        if (isMounted) {
-                            setStatus(`Error fetching code: ${error.message}. Using default content.`);
-                            console.error('Code fetch failed:', error);
-                        }
-                    }
-
-                    // Initialize Monaco Editor
-                    window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
-                    window.require(['vs/editor/editor.main'], () => {
-                        if (!isMounted || !document.getElementById('editor')) {
-                            console.error('Editor container not found');
-                            if (isMounted) setStatus('Error: Editor container not found');
+                async function initializeEditor() {
+                    const editorContainer = document.getElementById('editor');
+                    if (!editorContainer) {
+                        if (retryCount < maxRetries) {
+                            retryCount++;
+                            setTimeout(initializeEditor, 100 * retryCount);
                             return;
                         }
+                        console.error('Editor container not found');
+                        if (isMounted) setStatus('ERROR: Editor container not found');
+                        return;
+                    }
+
+                    window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
+                    window.require(['vs/editor/editor.main'], () => {
+                        if (!isMounted) return;
                         if (editorRef.current) editorRef.current.dispose();
-                        editorRef.current = monaco.editor.create(document.getElementById('editor'), {
+                        
+                        // Define a custom theme
+                        monaco.editor.defineTheme('cyberpunk', {
+                            base: 'vs-dark',
+                            inherit: true,
+                            rules: [
+                                { token: 'comment', foreground: '608b4e', fontStyle: 'italic' },
+                                { token: 'keyword', foreground: '569cd6' },
+                                { token: 'number', foreground: 'b5cea8' },
+                                { token: 'string', foreground: 'ce9178' },
+                                { token: 'type', foreground: '4ec9b0' },
+                                { token: 'function', foreground: 'dcdcaa' }
+                            ],
+                            colors: {
+                                'editor.background': '#0a0a1a',
+                                'editor.foreground': '#e0e0ff',
+                                'editorCursor.foreground': '#00f7ff',
+                                'editor.lineHighlightBackground': '#1e1e3f',
+                                'editorLineNumber.foreground': '#3d3d6e',
+                                'editor.selectionBackground': '#3a3a7a',
+                                'editor.inactiveSelectionBackground': '#2a2a5a'
+                            }
+                        });
+
+                        editorRef.current = monaco.editor.create(editorContainer, {
                             value: editorContent,
                             language: 'python',
-                            theme: 'vs-dark',
+                            theme: 'cyberpunk',
                             automaticLayout: true,
-                            fontFamily: 'monospace',
-                            fontSize: 14,
+                            fontFamily: 'Roboto Mono, monospace',
+                            fontSize: 13,
                             lineNumbers: 'on',
-                            minimap: { enabled: false }
+                            minimap: { enabled: true },
+                            scrollBeyondLastLine: false,
+                            renderLineHighlight: 'gutter',
+                            glyphMargin: true,
+                            folding: true,
+                            lineDecorationsWidth: 10,
+                            wordWrap: 'on'
                         });
+                        
                         editorRef.current.onDidChangeModelContent(() => {
                             setEditorContent(editorRef.current.getValue());
+                            if (activeTab === 'Write Your Own Logic') {
+                                generateAiSuggestions(editorRef.current.getValue());
+                            }
                         });
-                        if (isMounted) setStatus('Editor Initialized');
+                        
+                        if (isMounted) setStatus('EDITOR READY');
                     }, (err) => {
-                        console.error('Error loading Monaco Editor:', err);
-                        if (isMounted) setStatus('Error: Failed to load Monaco Editor');
+                        console.error('Error loading Monaco:', err);
+                        if (isMounted) setStatus('ERROR: Failed to load editor');
                     });
                 }
+
+                async function initialize() {
+                    if (serverAvailable) {
+                        try {
+                            setStatus('CONNECTING TO SERVER...');
+                            const response = await axios.get('http://localhost:3000/code/Fateh V1.0', { timeout: 5000 });
+                            if (isMounted && response.data.success) {
+                                setEditorContent(response.data.code);
+                                setStatus('LATEST CODE LOADED');
+                            } else {
+                                throw new Error('Invalid server response');
+                            }
+                        } catch (error) {
+                            if (isMounted) {
+                                console.error('Code fetch failed:', error);
+                                setEditorContent(defaultFatehCode);
+                                setStatus('SERVER OFFLINE - USING DEFAULT CODE');
+                                setServerAvailable(false);
+                            }
+                        }
+                    } else {
+                        setEditorContent(defaultFatehCode);
+                        setStatus('READY (OFFLINE MODE)');
+                    }
+
+                    setTimeout(initializeEditor, 0);
+                }
+                
                 initialize();
 
                 return () => {
@@ -289,111 +843,235 @@
                         editorRef.current = null;
                     }
                 };
-            }, []);
+            }, [serverAvailable]);
+
+            const generateAiSuggestions = (code) => {
+                const suggestions = [];
+                try {
+                    // Analyze code for common issues
+                    const kpMatch = code.match(/kp\s*=\s*(\d*\.?\d+)/);
+                    const kiMatch = code.match(/ki\s*=\s*(\d*\.?\d+)/);
+                    const kdMatch = code.match(/kd\s*=\s*(\d*\.?\d+)/);
+                    const throttleMatch = code.match(/throttle_base\s*=\s*(\d+\.?\d*)/);
+                    const angleMatch = code.match(/max_angle\s*=\s*(\d+)/);
+
+                    const kp = kpMatch ? parseFloat(kpMatch[1]) : 1.0;
+                    const ki = kiMatch ? parseFloat(kiMatch[1]) : 0.05;
+                    const kd = kdMatch ? parseFloat(kdMatch[1]) : 0.2;
+                    const throttle = throttleMatch ? parseFloat(throttleMatch[1]) : 65535 * 0.5;
+                    const maxAngle = angleMatch ? parseInt(angleMatch[1]) : 45;
+
+                    // Generate suggestions based on analysis
+                    if (kp > 2.0) suggestions.push('High proportional gain (kp) may cause oscillations. Try 1.0-1.5 for smoother control.');
+                    if (ki > 0.1) suggestions.push('Integral gain (ki) too high - can cause wobbling. Lower to 0.01-0.05 for better stability.');
+                    if (kd > 0.5) suggestions.push('Derivative gain (kd) is high. Use 0.1-0.3 for optimal damping.');
+                    if (throttle > 65535 * 0.7) suggestions.push('Throttle base too strong! Keep below 70% (65535 * 0.4-0.6 recommended).');
+                    if (maxAngle > 60) suggestions.push('Maximum angle too wide. Keep between 30-45° for safe operation.');
+                    if (angles[0] > 10 || angles[1] > 10) suggestions.push('Drone is tilting significantly. Consider adjusting gains or reducing control inputs.');
+                    if (height > 5) suggestions.push('High altitude detected. Lower throttle for better control at lower heights.');
+
+                    // Check for missing components
+                    if (!code.includes('set_gains')) suggestions.push('Remember to set PID gains using pids[0].set_gains(kp, ki, kd)');
+                    if (!code.includes('update(')) suggestions.push('Make sure to update each PID controller with pids[0].update(target, current, dt)');
+
+                    setAiSuggestions(suggestions);
+                } catch (error) {
+                    setAiSuggestions(['Error analyzing code. Check your PID parameters and control logic.']);
+                }
+            };
 
             const handleTabChange = async (tab) => {
                 setActiveTab(tab);
                 if (tab === 'Write Your Own Logic') {
-                    setEditorContent(logicInput || '# Write your logic below\n');
+                    setEditorContent(modeTemplate);
                     if (editorRef.current) {
-                        editorRef.current.setValue(logicInput || '# Write your logic below\n');
+                        editorRef.current.setValue(modeTemplate);
                     }
+                    generateAiSuggestions(modeTemplate);
                 } else if (tab === 'Fateh V1.0') {
-                    setStatus('Fetching Code...');
-                    try {
-                        const response = await axios.get('http://localhost:3000/code/Fateh V1.0', { timeout: 5000 });
-                        if (response.data.success) {
-                            setEditorContent(response.data.code);
-                            if (editorRef.current) {
-                                editorRef.current.setValue(response.data.code);
+                    if (serverAvailable) {
+                        setStatus('FETCHING CODE...');
+                        try {
+                            const response = await axios.get('http://localhost:3000/code/Fateh V1.0', { timeout: 5000 });
+                            if (response.data.success) {
+                                setEditorContent(response.data.code);
+                                if (editorRef.current) {
+                                    editorRef.current.setValue(response.data.code);
+                                }
+                                setStatus('LATEST CODE LOADED');
+                            } else {
+                                setEditorContent(defaultFatehCode);
+                                if (editorRef.current) {
+                                    editorRef.current.setValue(defaultFatehCode);
+                                }
+                                setStatus('ERROR: Using default code');
+                                setServerAvailable(false);
                             }
-                            setStatus('Latest code fetched');
-                        } else {
-                            setStatus('Error: Failed to fetch code');
+                        } catch (error) {
+                            console.error('Code fetch failed:', error);
+                            setEditorContent(defaultFatehCode);
+                            if (editorRef.current) {
+                                editorRef.current.setValue(defaultFatehCode);
+                            }
+                            setStatus(`ERROR: ${error.message}`);
+                            setServerAvailable(false);
                         }
-                    } catch (error) {
-                        setStatus(`Error fetching code: ${error.message}`);
-                        console.error('Code fetch failed:', error);
+                    } else {
+                        setEditorContent(defaultFatehCode);
+                        if (editorRef.current) {
+                            editorRef.current.setValue(defaultFatehCode);
+                        }
+                        setStatus('READY (OFFLINE MODE)');
                     }
+                } else if (tab === 'Challenges') {
+                    setEditorContent(modeTemplate);
+                    if (editorRef.current) {
+                        editorRef.current.setValue(modeTemplate);
+                    }
+                }
+            };
+
+            const handleChallengeSelect = (challenge) => {
+                setSelectedType('Challenge');
+                setSelectedValue(challenge.title);
+                setEditorContent(modeTemplate);
+                if (editorRef.current) {
+                    editorRef.current.setValue(modeTemplate);
+                }
+                setUserProgress((prev) => ({
+                    ...prev,
+                    [challenge.id]: { ...prev[challenge.id], attempted: true }
+                }));
+                setStatus(`CHALLENGE: ${challenge.title}`);
+                setIsSimulating(true);
+            };
+
+            const checkChallenge = async (challenge) => {
+                if (!lastBuiltCode) {
+                    setStatus('ERROR: Build code first');
+                    return;
+                }
+                setStatus('EVALUATING PERFORMANCE...');
+                try {
+                    const { height: targetHeight, rollMax, pitchMax, duration } = challenge.criteria;
+                    const simulationTime = duration * 1000;
+                    let elapsed = 0;
+                    let isSuccessful = true;
+
+                    // Simulate the challenge evaluation
+                    while (elapsed < simulationTime && isSimulating) {
+                        // Check if drone meets challenge criteria
+                        if (
+                            Math.abs(height - targetHeight) > 0.5 || // Height tolerance
+                            Math.abs(angles[0]) > rollMax ||           // Roll tolerance
+                            Math.abs(angles[1]) > pitchMax             // Pitch tolerance
+                        ) {
+                            isSuccessful = false;
+                            break;
+                        }
+                        await new Promise((resolve) => setTimeout(resolve, 100));
+                        elapsed += 100;
+                    }
+
+                    if (isSuccessful) {
+                        setUserProgress((prev) => ({
+                            ...prev,
+                            [challenge.id]: { completed: true, score: challenge.points }
+                        }));
+                        setLeaderboard((prev) =>
+                            prev
+                                .map((entry) =>
+                                    entry.name === 'You'
+                                        ? { ...entry, score: entry.score + challenge.points }
+                                        : entry
+                                )
+                                .sort((a, b) => b.score - a.score)
+                        );
+                        setStatus('CHALLENGE COMPLETED!');
+                    } else {
+                        setStatus('CHALLENGE FAILED');
+                    }
+                } catch (error) {
+                    setStatus(`ERROR: ${error.message}`);
                 }
             };
 
             const uploadCode = async () => {
                 if (!lastBuiltCode) {
-                    setStatus('Error: No successfully built code to deploy');
+                    setStatus('ERROR: No built code');
                     return;
                 }
-                setStatus('Checking drone connection...');
+                setStatus('SCANNING DRONE...');
                 try {
                     const checkResponse = await axios.get('http://192.168.4.1:8080/ping', { timeout: 3000 });
                     if (checkResponse.data && checkResponse.data.status === 'connected') {
-                        setStatus('Uploading...');
-                        const uploadResponse = await axios.post('http://192.168.4.1:8080/upload', lastBuiltCode, { timeout: 5000 });
-                        setStatus('Code uploaded');
+                        setStatus('UPLOADING CODE...');
+                        const modeFunction = editorContent.match(/def mode\(.*?\):[\s\S]*?(?=\n\n|$)/s)?.[0] || '';
+                        if (!modeFunction) {
+                            setStatus('ERROR: No mode() function');
+                            return;
+                        }
+                        const uploadResponse = await axios.post(
+                            'http://192.168.4.1:8080/upload',
+                            `upload:${modeFunction}`,
+                            { timeout: 5000 }
+                        );
+                        setStatus('CODE UPLOADED');
                     } else {
-                        setStatus('Drone is not connected');
+                        setStatus('DRONE NOT CONNECTED');
                     }
                 } catch (error) {
-                    setStatus('Drone is not connected');
+                    setStatus('DRONE CONNECTION FAILED');
                     console.error('Upload failed:', error);
                 } finally {
-                    setTimeout(() => setStatus('OPERATIONAL'), 3000);
+                    setTimeout(() => setStatus('READY'), 3000);
                 }
             };
 
             const buildCode = async () => {
-                setStatus('Building...');
+                setStatus('COMPILING CODE...');
                 setBuildOutput('');
                 try {
-                    const fullCode = editorContent;
+                    const fullCode = activeTab === 'Write Your Own Logic' || activeTab === 'Challenges'
+                        ? `# Imports\n${editorContent}`
+                        : editorContent;
                     const response = await axios.post('http://localhost:3000/build', { customCode: fullCode }, { timeout: 5000 });
                     if (response.data.success) {
-                        setBuildOutput(`Build successful:\n${response.data.output}`);
+                        setBuildOutput(`BUILD SUCCESS:\n${response.data.output}`);
                         setLastBuiltCode(fullCode);
                         localStorage.setItem('lastBuiltCode', fullCode);
                     } else {
-                        setBuildOutput(`Build failed:\n${response.data.error}`);
+                        setBuildOutput(`BUILD FAILED:\n${response.data.error}`);
                     }
                 } catch (error) {
-                    setBuildOutput(`Error: ${error.message || 'Server unavailable'}`);
+                    setBuildOutput(`ERROR: ${error.message}`);
                 } finally {
-                    setTimeout(() => setStatus('OPERATIONAL'), 2000);
+                    setTimeout(() => setStatus('READY'), 2000);
                 }
             };
 
             const createSimulation = async () => {
                 if (buildOutput.startsWith('Error') || buildOutput === '') {
-                    setStatus('Error: Build code first without errors');
+                    setStatus('ERROR: Build code first');
                     return;
                 }
-                setStatus('Creating Simulation...');
+                setStatus('INITIALIZING SIMULATION...');
                 setIsSimulating(true);
-                setStatus('Simulation Created');
-            };
-
-            const startSimulation = () => {
-                setIsSimulating(true);
-                setStatus('Simulation Running');
+                setStatus('SIMULATION ACTIVE');
             };
 
             const convertLogicToCode = () => {
-                setStatus('Converting...');
-                let convertedCode = `# Converted from logic: ${logicInput}\n`;
+                setStatus('PROCESSING LOGIC...');
+                let convertedCode = `# Converted from: "${logicInput}"\n`;
 
                 try {
                     const input = logicInput.trim().toLowerCase();
-                    if (!input) {
-                        throw new Error('No logic provided');
-                    }
+                    if (!input) throw new Error('No logic provided');
 
-                    if (!input.startsWith('if')) {
-                        throw new Error('Logic must start with "if"');
-                    }
+                    if (!input.startsWith('if')) throw new Error('Start with "if"');
 
                     const conditionMatch = input.match(/if\s+(.+?),\s*(.+)/);
-                    if (!conditionMatch) {
-                        throw new Error('Invalid format. Use: "If [condition], [action]"');
-                    }
+                    if (!conditionMatch) throw new Error('Use format: "If [condition], [action]"');
 
                     const [_, condition, action] = conditionMatch;
 
@@ -413,7 +1091,7 @@
                             const percentage = parseInt(speedMatch[1]) / 100;
                             pythonAction = `set_motor_speeds(m1 * ${1 - percentage}, m2 * ${1 - percentage}, m3 * ${1 - percentage}, m4 * ${1 - percentage})`;
                         } else {
-                            throw new Error('Invalid action. Specify percentage (e.g., "reduce motor speed by 10%")');
+                            throw new Error('Specify percentage like "reduce motor speed by 10%"');
                         }
                     } else if (action.includes('increase motor speed by')) {
                         const speedMatch = action.match(/increase motor speed by\s*(\d+)%/);
@@ -421,7 +1099,7 @@
                             const percentage = parseInt(speedMatch[1]) / 100;
                             pythonAction = `set_motor_speeds(m1 * ${1 + percentage}, m2 * ${1 + percentage}, m3 * ${1 + percentage}, m4 * ${1 + percentage})`;
                         } else {
-                            throw new Error('Invalid action. Specify percentage (e.g., "increase motor speed by 10%")');
+                            throw new Error('Specify percentage like "increase motor speed by 10%"');
                         }
                     } else if (action.includes('set motor speed to')) {
                         const speedMatch = action.match(/set motor speed to\s*(\d+)/);
@@ -429,10 +1107,10 @@
                             const value = parseInt(speedMatch[1]);
                             pythonAction = `set_motor_speeds(${value}, ${value}, ${value}, ${value})`;
                         } else {
-                            throw new Error('Invalid action. Specify value (e.g., "set motor speed to 100")');
+                            throw new Error('Specify value like "set motor speed to 100"');
                         }
                     } else {
-                        throw new Error('Unsupported action. Use "reduce/increase motor speed by X%" or "set motor speed to X"');
+                        throw new Error('Use "reduce/increase motor speed by X%" or "set motor speed to X"');
                     }
 
                     convertedCode += `if ${pythonCondition}:\n    ${pythonAction}`;
@@ -444,53 +1122,85 @@
                 setEditorContent(updatedContent);
                 if (editorRef.current) {
                     editorRef.current.setValue(updatedContent);
-                } else {
-                    console.error('Editor not initialized');
-                    setStatus('Error: Editor not initialized');
                 }
-                setStatus('Code Converted');
-                setTimeout(() => setStatus('OPERATIONAL'), 2000);
+                setStatus('LOGIC CONVERTED');
+                generateAiSuggestions(updatedContent);
+                setTimeout(() => setStatus('READY'), 2000);
             };
 
             return (
-                <div className="container mx-auto p-6 max-w-7xl">
-                    <h1 className="text-4xl font-bold text-center mb-8 text-[#00FFFF] tracking-wider animate-[pulse_3s_infinite]">
-                        AirM Fateh Drone Logic Learner
-                    </h1>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2">
-                            <div id="editor" className="h-[800px] w-full futuristic-border rounded-lg scan-effect"></div>
-                            <div className="mt-4 p-4 bg-gray-700 rounded-lg flex flex-wrap gap-4 items-start">
-                                <button onClick={buildCode}
-                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-2 px-4 rounded-lg futuristic-border animate-[pulse_2s_infinite]">
-                                    BUILD
-                                </button>
-                                <button onClick={createSimulation}
-                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-2 px-4 rounded-lg futuristic-border animate-[pulse_2s_infinite]"
-                                    disabled={buildOutput.startsWith('Error') || buildOutput === ''}>
-                                    CREATE SIMULATION
-                                </button>
-                                {activeTab === 'Write Your Own Logic' && (
-                                    <button onClick={convertLogicToCode}
-                                        className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-2 px-4 rounded-lg futuristic-border animate-[pulse_2s_infinite]">
-                                        CONVERT TO CODE
+                <div className="container mx-auto p-4 max-w-[95vw]">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h1 className="text-3xl cyber-text">AIRM FATEH DRONE</h1>
+                            <h2 className="text-xl cyber-text-secondary">LOGIC PROGRAMMING INTERFACE</h2>
+                        </div>
+                        <StatusIndicator status={status} />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-180px)]">
+                        {/* Left Panel - Editor */}
+                        <div className="cyber-card p-4 flex flex-col">
+                            <div className="flex justify-between items-center mb-3">
+                                <h2 className="text-md cyber-text">CODE EDITOR</h2>
+                                <div className="flex gap-2">
+                                    <button onClick={buildCode} className="cyber-button text-xs">BUILD</button>
+                                    <button 
+                                        onClick={createSimulation} 
+                                        className="cyber-button text-xs" 
+                                        disabled={buildOutput.startsWith('Error') || buildOutput === ''}
+                                    >
+                                        SIMULATE
                                     </button>
-                                )}
-                                <pre className="mt-2 text-[#00FFFF] whitespace-pre-wrap flex-1">{buildOutput}</pre>
+                                </div>
                             </div>
+                            
+                            <div id="editor" className="flex-1 rounded-md"></div>
+                            
                             {activeTab === 'Write Your Own Logic' && (
-                                <div className="mt-4 p-4 bg-gray-700 rounded-lg futuristic-border">
+                                <div className="mt-3">
                                     <textarea
-                                        className="w-full h-32 p-2 bg-gray-800 text-[#00FFFF] border border-[#00FF00] rounded-lg resize-none font-mono"
-                                        placeholder="Write your logic here (e.g., 'If height > 10 meters, reduce motor speed by 10%')"
+                                        className="w-full h-16 p-2 bg-black text-cyan-300 border border-purple-500 rounded-md text-xs font-mono"
+                                        placeholder="Enter logic (e.g., 'If height > 10 meters, reduce motor speed by 10%')"
                                         value={logicInput}
                                         onChange={(e) => setLogicInput(e.target.value)}
                                     />
+                                    <button 
+                                        onClick={convertLogicToCode} 
+                                        className="cyber-button w-full mt-1 text-xs"
+                                    >
+                                        CONVERT TO CODE
+                                    </button>
                                 </div>
                             )}
+                            
+                            {aiSuggestions.length > 0 && (
+                                <div className="mt-2 max-h-[100px] overflow-y-auto">
+                                    {aiSuggestions.map((suggestion, index) => (
+                                        <div key={index} className="ai-suggestion">
+                                            {suggestion}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            
+                            <div className="mt-2">
+                                <pre className="text-xs font-mono text-green-400 overflow-x-auto">
+                                    {buildOutput}
+                                </pre>
+                            </div>
+                            
+                            <button 
+                                onClick={uploadCode} 
+                                className="cyber-button mt-2 w-full text-xs"
+                                disabled={!lastBuiltCode}
+                            >
+                                DEPLOY TO DRONE
+                            </button>
                         </div>
-                        <div className="space-y-6">
-                            <Tabs activeTab={activeTab} onTabChange={handleTabChange} />
+                        
+                        {/* Center Panel - Simulation */}
+                        <div className="flex flex-col">
                             <SimulationWindow 
                                 selectedType={selectedType}
                                 selectedValue={selectedValue}
@@ -502,25 +1212,30 @@
                                 setHeight={setHeight}
                             />
                         </div>
-                    </div>
-                    <div className="mt-6 flex flex-col items-center gap-6">
-                        <AnimationWindow status={status} />
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="flex gap-4">
-                                <button onClick={startSimulation}
-                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-3 px-6 rounded-lg futuristic-border animate-[pulse_2s_infinite]">
-                                    SIMULATE
-                                </button>
-                                <button onClick={uploadCode}
-                                    className="bg-[#00FF00] hover:bg-[#00CC00] text-black font-bold py-3 px-6 rounded-lg futuristic-border animate-[pulse_2s_infinite]"
-                                    disabled={!lastBuiltCode}>
-                                    DEPLOY PROTOCOL
-                                </button>
-                            </div>
-                            <p className="text-sm text-[#00FFFF] italic text-center">
-                                *Note: Before transferring the code to the drone, please connect to the drone WiFi network.
-                            </p>
+                        
+                        {/* Right Panel - Controls */}
+                        <div className="flex flex-col">
+                            <Tabs activeTab={activeTab} onTabChange={handleTabChange} />
+                            
+                            {activeTab === 'Challenges' && (
+                                <ChallengesWindow
+                                    challenges={challenges}
+                                    userProgress={userProgress}
+                                    onChallengeSelect={handleChallengeSelect}
+                                    checkChallenge={checkChallenge}
+                                />
+                            )}
+                            
+                            <LeaderboardWindow leaderboard={leaderboard} />
                         </div>
+                    </div>
+                    
+                    <div className="cyber-card p-3 mt-4 text-center">
+                        <p className="text-xs cyber-text">
+                            CONNECT TO DRONE WIFI (192.168.4.1) BEFORE DEPLOYING | 
+                            SYSTEM STATUS: {serverAvailable ? 'ONLINE' : 'OFFLINE'} | 
+                            VERSION: FATEH 1.0
+                        </p>
                     </div>
                 </div>
             );
